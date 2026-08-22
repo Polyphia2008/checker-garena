@@ -1,0 +1,242 @@
+{% extends "base.html" %}
+{% block title %}Garena Account Checker - Kiểm Tra Acc Liên Quân{% endblock %}
+
+{% block content %}
+<main style="flex: 1; display: flex; align-items: center; justify-content: center; padding: 60px 20px;">
+  <div style="width: 100%; max-width: 680px; background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(16px); border: 1px solid rgba(226, 232, 240, 0.8); border-radius: 24px; padding: 40px; box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.08), 0 0 0 1px rgba(255, 255, 255, 0.6) inset; transition: transform 0.3s ease, box-shadow 0.3s ease;">
+    
+    <div style="text-align: center; margin-bottom: 30px;">
+      <div style="display: inline-flex; align-items: center; justify-content: center; padding: 20px; background-color: rgba(59, 130, 246, 0.08); border-radius: 20px; margin-bottom: 16px; color: #3b82f6; box-shadow: 0 10px 20px -5px rgba(59, 130, 246, 0.2);">
+        <i class="fa-solid fa-shield-halved" style="display: block; font-size: 2.5rem; line-height: 1;"></i>
+      </div>
+      <h3 style="font-weight: 800; color: #0f172a; margin: 0 0 8px 0; font-size: 22px; letter-spacing: -0.5px;">Kiểm Tra Tài Khoản Garena</h3>
+      <p style="color: #64748b; font-size: 13.5px; margin: 0; line-height: 1.5;">Tra cứu thông tin acc Liên Quân Mobile: Rank, Skin, Tướng, Email, SĐT, Facebook...</p>
+    </div>
+
+    {% if current_user.is_authenticated %}
+    <div style="margin-bottom: 24px;">
+      <label style="display: block; font-size: 13px; font-weight: 700; color: #334155; margin-bottom: 8px;">Nhập UID Garena cần kiểm tra</label>
+      <div style="display: flex; gap: 12px; align-items: center; width: 100%;">
+        <input id="uidInput" type="text" class="input-field" placeholder="VD: 502376961" autocomplete="off" style="flex: 1; height: 46px; padding: 0 20px; border-radius: 9999px; border: 1.5px solid #cbd5e1; font-size: 14px; background: #fff; color: #0f172a; outline: none; transition: all 0.2s;">
+        <button onclick="checkAccount()" class="btn-check" style="background: #e0f2fe; border: 1.5px solid #bae6fd; color: #0369a1; height: 46px; padding: 0 24px; border-radius: 9999px; font-size: 14px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; transition: all 0.2s; white-space: nowrap;">
+          <i class="fa-solid fa-magnifying-glass"></i> <span class="btn-text">Kiểm tra</span>
+        </button>
+      </div>
+      <p style="color: #94a3b8; font-size: 11px; margin: 8px 0 0 0;">
+        {% set rem = current_user.remaining_checks() %}
+        Còn lại: <strong style="color: {% if rem > 20 %}#047857{% else %}#b91c1c{% endif %};">{{ rem }}</strong>/{{ current_user.daily_limit }} lượt check hôm nay
+      </p>
+    </div>
+
+    <!-- Loading Skeleton -->
+    <div id="loadingBox" style="display: none; width: 100%; flex-direction: column; gap: 12px; padding: 20px; border-radius: 16px; background-color: #f8fafc; border: 1px solid #edf2f7; box-sizing: border-box; margin-top: 20px;">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <div class="shimmer-bg" style="width: 24px; height: 24px; border-radius: 50%;"></div>
+        <div class="shimmer-bg" style="width: 180px; height: 16px; border-radius: 4px;"></div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 10px; border-top: 1px dashed rgba(226,232,240,0.8); padding-top: 16px;">
+        <div class="shimmer-bg" style="width: 90%; height: 12px; border-radius: 4px;"></div>
+        <div class="shimmer-bg" style="width: 70%; height: 12px; border-radius: 4px;"></div>
+        <div class="shimmer-bg" style="width: 80%; height: 12px; border-radius: 4px;"></div>
+        <div class="shimmer-bg" style="width: 60%; height: 12px; border-radius: 4px;"></div>
+        <div class="shimmer-bg" style="width: 85%; height: 12px; border-radius: 4px;"></div>
+      </div>
+    </div>
+
+    <!-- Result Box -->
+    <div id="resultBox" style="display: none; padding: 20px; border-radius: 16px; font-size: 13.5px; flex-direction: column; gap: 12px; border: 1px solid transparent; margin-top: 20px; box-sizing: border-box;"></div>
+    {% else %}
+    <div style="text-align: center; padding: 20px;">
+      <p style="color: #64748b; font-size: 14px; margin-bottom: 20px;">Bạn cần đăng nhập hoặc đăng ký tài khoản để sử dụng công cụ check acc.</p>
+      <div style="display: flex; gap: 12px; justify-content: center;">
+        <a href="{{ url_for('login_page') }}" class="btn-primary"><i class="fa-solid fa-right-to-bracket"></i> Đăng nhập</a>
+        <a href="{{ url_for('register_page') }}" class="btn-outline"><i class="fa-solid fa-user-plus"></i> Đăng ký miễn phí</a>
+      </div>
+      <p style="color: #94a3b8; font-size: 11px; margin-top: 16px;">Mỗi tài khoản được <strong>100 lượt check miễn phí</strong> mỗi ngày.</p>
+    </div>
+    {% endif %}
+
+    <div style="margin-top: 25px; padding: 18px; border-radius: 16px; background-color: #f8fafc; border: 1px solid rgba(226, 232, 240, 0.8); box-sizing: border-box;">
+      <h6 style="font-weight: 700; color: #1e293b; font-size: 13px; margin: 0 0 8px 0; display: flex; align-items: center; gap: 6px;">
+        <i class="fa-solid fa-circle-info" style="color: #3b82f6;"></i> Công cụ kiểm tra những gì?
+      </h6>
+      <p style="color: #64748b; font-size: 12px; margin: 0; line-height: 1.65;">
+        Hệ thống kiểm tra toàn diện tài khoản Garena Liên Quân Mobile: UID, tên Garena, tên game, cấp độ, rank hiện tại, rank cao nhất, tỉ lệ thắng, số tướng, số skin, skin SSS/SS/Anime, email (đã xác thực), số điện thoại, mật khẩu, bảo mật 2FA, Facebook liên kết, CCCD, trạng thái ban và nhiều thông tin khác.
+      </p>
+    </div>
+  </div>
+</main>
+
+<style>
+  .input-field:focus { border-color: #3b82f6 !important; box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.15) !important; }
+  .btn-check:hover { background: #bae6fd !important; color: #0284c7 !important; transform: translateY(-1px); }
+  .btn-check:active { transform: translateY(1px); }
+  .shimmer-bg {
+    background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite linear;
+  }
+  @keyframes shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+  .result-row { display: flex; align-items: flex-start; gap: 8px; padding: 6px 0; border-bottom: 1px solid rgba(226,232,240,0.4); }
+  .result-row:last-child { border-bottom: none; }
+  .result-label { font-weight: 600; min-width: 130px; color: #475569; font-size: 12px; text-transform: uppercase; letter-spacing: 0.3px; }
+  .result-value { color: #0f172a; font-weight: 500; word-break: break-word; }
+  .badge-skin { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; margin: 2px; }
+  .badge-sss { background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; }
+  .badge-ss { background: #ede9fe; color: #5b21b6; border: 1px solid #c4b5fd; }
+  .badge-anime { background: #fce7f3; color: #9d174d; border: 1px solid #f9a8d4; }
+  .badge-rank { background: #dbeafe; color: #1e40af; border: 1px solid #93c5fd; }
+</style>
+
+{% if current_user.is_authenticated %}
+<script>
+  const uidInput = document.getElementById('uidInput');
+  const loadingBox = document.getElementById('loadingBox');
+  const resultBox = document.getElementById('resultBox');
+
+  uidInput.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') checkAccount();
+  });
+
+  async function checkAccount() {
+    const uid = uidInput.value.trim();
+    if (!uid) return alert('Vui lòng nhập UID!');
+    if (!/^\d+$/.test(uid)) return alert('UID không hợp lệ!');
+
+    loadingBox.style.display = 'flex';
+    resultBox.style.display = 'none';
+
+    try {
+      const res = await fetch('/api/check', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ uid: uid })
+      });
+      const data = await res.json();
+      loadingBox.style.display = 'none';
+
+      if (data.success) {
+        renderResult(data.data);
+        updateRemaining(data.remaining);
+      } else {
+        resultBox.style.display = 'flex';
+        resultBox.style.background = 'rgba(239,68,68,0.06)';
+        resultBox.style.borderColor = 'rgba(239,68,68,0.15)';
+        resultBox.style.color = '#b91c1c';
+        resultBox.innerHTML = `<div style="display:flex;align-items:center;gap:8px;font-weight:700;font-size:15px;"><i class="fa-solid fa-circle-xmark"></i> ${data.error}</div>`;
+        if (data.remaining !== undefined) updateRemaining(data.remaining);
+      }
+    } catch (err) {
+      loadingBox.style.display = 'none';
+      resultBox.style.display = 'flex';
+      resultBox.style.background = 'rgba(239,68,68,0.06)';
+      resultBox.style.borderColor = 'rgba(239,68,68,0.15)';
+      resultBox.style.color = '#b91c1c';
+      resultBox.innerHTML = '<div style="display:flex;align-items:center;gap:8px;font-weight:700;font-size:15px;"><i class="fa-solid fa-triangle-exclamation"></i> Lỗi kết nối hệ thống. Vui lòng thử lại sau.</div>';
+    }
+  }
+
+  function updateRemaining(rem) {
+    const el = document.querySelector('#uidInput + p strong');
+    if (el) {
+      el.textContent = rem;
+      el.style.color = rem > 20 ? '#047857' : '#b91c1c';
+    }
+    // Update header badge
+    const badge = document.querySelector('.header-container span span');
+    if (badge) {
+      badge.textContent = rem + ' lượt';
+      badge.style.background = rem > 20 ? '#dbeafe' : '#fee2e2';
+      badge.style.color = rem > 20 ? '#1e40af' : '#991b1b';
+    }
+  }
+
+  function renderResult(d) {
+    resultBox.style.display = 'flex';
+    resultBox.style.background = 'rgba(16, 185, 129, 0.06)';
+    resultBox.style.borderColor = 'rgba(16, 185, 129, 0.15)';
+    resultBox.style.color = '#047857';
+
+    let html = `
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;font-weight:800;font-size:15px;margin-bottom:4px;">
+        <span style="display:flex;align-items:center;gap:6px;"><i class="fa-solid fa-circle-check"></i> Kết quả kiểm tra UID: ${d.uid || ''}</span>
+        <button onclick="copyResult()" style="background:rgba(16,185,129,0.1);border:none;padding:6px 12px;border-radius:8px;font-size:12px;color:#047857;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:4px;"><i class="fa-solid fa-copy"></i> Sao chép</button>
+      </div>
+      <div style="border-top:1px dashed rgba(16,185,129,0.2);padding-top:10px;display:flex;flex-direction:column;gap:4px;font-size:13px;color:#065f46;line-height:1.7;">
+        ${renderField('UID', d.uid)}
+        ${renderField('Tên Garena', d.name_garena)}
+        ${renderField('Tên Game', d.name_game)}
+        ${renderField('Level', d.level)}
+        ${renderField('Rank hiện tại', d.rank_current + (d.stars_current ? ' (' + d.stars_current + 's)' : ''))}
+        ${renderField('QH', d.qh)}
+        ${renderField('Sò', d.so)}
+        ${renderField('Email', d.email + (d.email_verified ? ' (ĐÃ XÁC THỰC)' : ''))}
+        ${renderField('SĐT', d.phone)}
+        ${renderField('Password', d.pass_set)}
+        ${renderField('Authen', d.authen)}
+        ${renderField('Facebook', d.fb)}
+        ${renderField('CCCD', d.cccd)}
+        ${renderField('Tướng', d.heroes)}
+        ${renderField('Skin', d.skins)}
+        ${renderSkinBadges('SSS', d.sss_skins, 'badge-sss')}
+        ${renderSkinBadges('SS', d.ss_skins, 'badge-ss')}
+        ${renderSkinBadges('Anime', d.anime_skins, 'badge-anime')}
+        ${renderField('SSM', d.ssm_count)}
+        ${renderField('S+', d.sp_count)}
+        ${renderField('S', d.s_count)}
+        ${renderField('A', d.a_count)}
+        ${renderField('Rank cao nhất', d.rank_highest + (d.stars_highest ? ' (' + d.stars_highest + 's)' : ''))}
+        ${renderField('Tổng trận mùa này', d.total_matches)}
+        ${renderField('Trận thắng', d.total_wins)}
+        ${renderField('MVP', d.total_mvp)}
+        ${renderField('Tỉ lệ thắng', d.win_rate ? d.win_rate + '%' : '')}
+        ${renderTopHeroes(d.top_heroes)}
+        ${renderField('Ban', d.ban_status || 'OK')}
+        ${renderField('Tình trạng', d.status || 'Full Info')}
+      </div>`;
+
+    resultBox.innerHTML = html;
+    window._lastResult = d;
+  }
+
+  function renderField(label, value) {
+    if (value === undefined || value === null || value === '') return '';
+    return `<div class="result-row"><span class="result-label">${label}</span><span class="result-value">${value}</span></div>`;
+  }
+
+  function renderSkinBadges(label, skins, cls) {
+    if (!skins || (Array.isArray(skins) && skins.length === 0)) return '';
+    const list = Array.isArray(skins) ? skins : [skins];
+    const badges = list.map(s => `<span class="badge-skin ${cls}">${s}</span>`).join('');
+    return `<div class="result-row"><span class="result-label">${label} (${list.length})</span><span class="result-value">${badges}</span></div>`;
+  }
+
+  function renderTopHeroes(heroes) {
+    if (!heroes || (Array.isArray(heroes) && heroes.length === 0)) return '';
+    const list = Array.isArray(heroes) ? heroes : (typeof heroes === 'string' ? heroes.split(',') : [heroes]);
+    const items = list.map(h => {
+      if (typeof h === 'object') return `${h.name || h.hero || ''} (${h.win_rate || h.winrate || ''}${h.matches ? ' ' + h.matches + ' trận' : ''})`;
+      return h;
+    }).join(', ');
+    return `<div class="result-row"><span class="result-label">Tướng tủ</span><span class="result-value">${items}</span></div>`;
+  }
+
+  async function copyResult() {
+    if (!window._lastResult) return;
+    const d = window._lastResult;
+    let text = `🔍 [KẾT QUẢ CHECK GARENA]\\n`;
+    text += `UID: ${d.uid}\\nTên Garena: ${d.name_garena}\\nTên Game: ${d.name_game}\\nLevel: ${d.level}\\n`;
+    text += `Rank hiện tại: ${d.rank_current}${d.stars_current ? ' ('+d.stars_current+'s)' : ''}\\n`;
+    text += `QH: ${d.qh} | Sò: ${d.so}\\nEmail: ${d.email}${d.email_verified ? ' (ĐÃ XÁC THỰC)' : ''}\\n`;
+    text += `SĐT: ${d.phone} | Pass: ${d.pass_set} | Authen: ${d.authen}\\n`;
+    text += `FB: ${d.fb} | CCCD: ${d.cccd}\\nTướng: ${d.heroes} | Skin: ${d.skins}\\n`;
+    text += `Rank cao nhất: ${d.rank_highest}\\nWin rate: ${d.win_rate}%\\n`;
+    await navigator.clipboard.writeText(text);
+    alert('Đã sao chép kết quả!');
+  }
+</script>
+{% endif %}
+{% endblock %}

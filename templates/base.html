@@ -1,0 +1,380 @@
+<!doctype html>
+<html lang="vi" class="h-full light" data-kt-theme="true" data-kt-theme-mode="light">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+  <title>{% block title %}Garena Account Checker{% endblock %}</title>
+  <meta name="description" content="Kiểm tra tài khoản Garena Liên Quân Mobile - Check acc, skin, rank">
+  <meta name="keywords" content="garena, check acc, lien quan, account checker">
+  
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link href="{{ url_for('static', filename='assets/vendors/keenicons/styles.bundle.css') }}" rel="stylesheet" />
+  <link href="{{ url_for('static', filename='assets/css/styles.css') }}" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+  
+  <style>
+    body {
+      background: radial-gradient(at 50% 0%, rgba(59, 130, 246, 0.08) 0%, transparent 50%), 
+                  radial-gradient(at 0% 100%, rgba(147, 51, 234, 0.05) 0%, transparent 50%), 
+                  #f8fafc !important;
+      font-family: 'Inter', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      margin: 0;
+      padding-top: 70px;
+    }
+
+    #header {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 70px;
+      background-color: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid rgba(226, 232, 240, 0.8);
+      z-index: 9999;
+      display: flex;
+      align-items: center;
+    }
+
+    .header-container {
+      width: 100%;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .logo-link {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+      font-weight: 800;
+      color: #0f172a;
+      font-size: 18px;
+    }
+
+    .menu-toggle {
+      display: none;
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: #0f172a;
+      padding: 6px;
+    }
+
+    #sidebar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      bottom: 0;
+      width: 270px;
+      height: 100vh;
+      background-color: #ffffff;
+      z-index: 10005;
+      border-right: 1px solid #e2e8f0;
+      transform: translateX(-100%);
+      transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+    }
+
+    #sidebar.show { transform: translateX(0); }
+
+    #sidebar-backdrop {
+      position: fixed;
+      inset: 0;
+      background-color: rgba(15, 23, 42, 0.3);
+      backdrop-filter: blur(4px);
+      z-index: 10000;
+      display: none;
+    }
+
+    #sidebar-backdrop.show { display: block; }
+
+    .site-footer {
+      background-color: #ffffff;
+      border-top: 1px solid #edf2f7;
+      padding: 50px 20px 30px;
+      margin-top: auto;
+    }
+
+    .footer-container { max-width: 1200px; margin: 0 auto; }
+
+    .footer-grid {
+      display: grid;
+      grid-template-columns: 2fr 1fr 1fr;
+      gap: 40px;
+      padding-bottom: 30px;
+      border-bottom: 1px solid #edf2f7;
+    }
+
+    .footer-col h4 {
+      font-size: 13px;
+      font-weight: 700;
+      color: #0f172a;
+      text-transform: uppercase;
+      margin-bottom: 20px;
+      letter-spacing: 0.5px;
+    }
+
+    .footer-links { display: flex; flex-direction: column; gap: 12px; }
+
+    .footer-links a, .footer-contact-item {
+      font-size: 13px;
+      color: #64748b;
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: color 0.2s;
+    }
+
+    .footer-links a:hover { color: #3b82f6; }
+
+    .footer-copyright {
+      padding-top: 20px;
+      text-align: center;
+      font-size: 12px;
+      color: #94a3b8;
+    }
+
+    .nav-menu-link {
+      text-decoration: none;
+      color: #475569;
+      font-weight: 600;
+      font-size: 13px;
+      letter-spacing: 0.5px;
+      transition: color 0.2s;
+    }
+
+    .nav-menu-link:hover { color: #3b82f6; }
+
+    .btn-primary {
+      background: #3b82f6;
+      color: #fff;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 9999px;
+      font-weight: 700;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .btn-primary:hover { background: #2563eb; transform: translateY(-1px); }
+
+    .btn-outline {
+      background: transparent;
+      border: 1.5px solid #cbd5e1;
+      color: #475569;
+      padding: 10px 20px;
+      border-radius: 9999px;
+      font-weight: 700;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .btn-outline:hover { border-color: #3b82f6; color: #3b82f6; }
+
+    .btn-danger {
+      background: #ef4444;
+      color: #fff;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 9999px;
+      font-weight: 700;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-danger:hover { background: #dc2626; }
+
+    .alert {
+      padding: 14px 20px;
+      border-radius: 12px;
+      margin-bottom: 16px;
+      font-size: 14px;
+      font-weight: 500;
+    }
+    .alert-success { background: rgba(16,185,129,0.1); color: #047857; border: 1px solid rgba(16,185,129,0.2); }
+    .alert-danger { background: rgba(239,68,68,0.1); color: #b91c1c; border: 1px solid rgba(239,68,68,0.2); }
+    .alert-warning { background: rgba(245,158,11,0.1); color: #92400e; border: 1px solid rgba(245,158,11,0.2); }
+    .alert-info { background: rgba(59,130,246,0.1); color: #1e40af; border: 1px solid rgba(59,130,246,0.2); }
+
+    @media (max-width: 1024px) {
+      .menu-toggle { display: block !important; }
+      .footer-grid { grid-template-columns: 1fr; gap: 30px; }
+      .desktop-nav { display: none !important; }
+    }
+
+    @media (max-width: 576px) {
+      .header-container { padding: 0 12px; }
+    }
+  </style>
+  {% block extra_head %}{% endblock %}
+</head>
+<body>
+
+  <!-- Mobile Sidebar -->
+  <div id="sidebar">
+    <div style="display: flex; align-items: center; justify-content: space-between; padding: 20px; border-bottom: 1px solid #e2e8f0;">
+      <span style="font-weight: 700; color: #1e293b; font-size: 15px;">MENU</span>
+      <button onclick="toggleSidebar()" style="background: none; border: none; cursor: pointer; color: #64748b; font-size: 20px;">&times;</button>
+    </div>
+    <div style="padding: 20px; display: flex; flex-direction: column; gap: 15px;">
+      <a href="/" style="display: flex; align-items: center; gap: 10px; text-decoration: none; color: #1e293b; font-weight: 600; font-size: 14px;">
+        <i class="fa-solid fa-house text-primary"></i> Trang chủ
+      </a>
+      {% if current_user.is_authenticated %}
+      <a href="{{ url_for('dashboard') }}" style="display: flex; align-items: center; gap: 10px; text-decoration: none; color: #1e293b; font-weight: 600; font-size: 14px;">
+        <i class="fa-solid fa-gauge-high text-success"></i> Dashboard
+      </a>
+      <a href="{{ url_for('history_page') }}" style="display: flex; align-items: center; gap: 10px; text-decoration: none; color: #1e293b; font-weight: 600; font-size: 14px;">
+        <i class="fa-solid fa-clock-rotate-left text-warning"></i> Lịch sử
+      </a>
+      {% if current_user.is_admin %}
+      <a href="{{ url_for('admin_panel') }}" style="display: flex; align-items: center; gap: 10px; text-decoration: none; color: #1e293b; font-weight: 600; font-size: 14px;">
+        <i class="fa-solid fa-shield-halved text-danger"></i> Admin Panel
+      </a>
+      {% endif %}
+      <hr style="border-color: #e2e8f0; margin: 4px 0;">
+      <a href="#" onclick="logout(); return false;" style="display: flex; align-items: center; gap: 10px; text-decoration: none; color: #ef4444; font-weight: 600; font-size: 14px;">
+        <i class="fa-solid fa-right-from-bracket"></i> Đăng xuất
+      </a>
+      {% else %}
+      <a href="{{ url_for('login_page') }}" style="display: flex; align-items: center; gap: 10px; text-decoration: none; color: #1e293b; font-weight: 600; font-size: 14px;">
+        <i class="fa-solid fa-right-to-bracket text-primary"></i> Đăng nhập
+      </a>
+      <a href="{{ url_for('register_page') }}" style="display: flex; align-items: center; gap: 10px; text-decoration: none; color: #1e293b; font-weight: 600; font-size: 14px;">
+        <i class="fa-solid fa-user-plus text-success"></i> Đăng ký
+      </a>
+      {% endif %}
+    </div>
+  </div>
+  <div id="sidebar-backdrop" onclick="toggleSidebar()"></div>
+
+  <!-- Header -->
+  <header id="header">
+    <div class="header-container">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <button onclick="toggleSidebar()" class="menu-toggle">
+          <i class="fa-solid fa-bars fa-lg" style="color: #0f172a;"></i>
+        </button>
+        <a href="/" class="logo-link">
+          <i class="fa-solid fa-shield-halved" style="color: #3b82f6; font-size: 24px;"></i>
+          <span>GARENA CHECKER</span>
+        </a>
+      </div>
+
+      <nav class="desktop-nav" style="display: flex; align-items: center; gap: 24px;">
+        <a href="/" class="nav-menu-link"><i class="fa-solid fa-house"></i> TRANG CHỦ</a>
+        {% if current_user.is_authenticated %}
+        <a href="{{ url_for('dashboard') }}" class="nav-menu-link"><i class="fa-solid fa-gauge-high"></i> DASHBOARD</a>
+        <a href="{{ url_for('history_page') }}" class="nav-menu-link"><i class="fa-solid fa-clock-rotate-left"></i> LỊCH SỬ</a>
+        {% if current_user.is_admin %}
+        <a href="{{ url_for('admin_panel') }}" class="nav-menu-link"><i class="fa-solid fa-shield-halved"></i> ADMIN</a>
+        {% endif %}
+        <span style="color: #94a3b8; font-size: 13px;">|</span>
+        <span style="font-size: 13px; color: #475569; font-weight: 600;">
+          <i class="fa-solid fa-user"></i> {{ current_user.username }}
+          {% set rem = current_user.remaining_checks() %}
+          <span style="margin-left: 6px; background: {% if rem > 20 %}#dbeafe{% else %}#fee2e2{% endif %}; color: {% if rem > 20 %}#1e40af{% else %}#991b1b{% endif %}; padding: 2px 10px; border-radius: 20px; font-size: 12px;">{{ rem }} lượt</span>
+        </span>
+        <a href="#" onclick="logout(); return false;" class="btn-outline" style="padding: 8px 16px; font-size: 12px;"><i class="fa-solid fa-right-from-bracket"></i> Đăng xuất</a>
+        {% else %}
+        <a href="{{ url_for('login_page') }}" class="btn-outline" style="padding: 8px 16px; font-size: 12px;">Đăng nhập</a>
+        <a href="{{ url_for('register_page') }}" class="btn-primary" style="padding: 8px 16px; font-size: 12px;">Đăng ký</a>
+        {% endif %}
+      </nav>
+    </div>
+  </header>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    <div style="position: fixed; top: 80px; right: 20px; z-index: 9998; max-width: 400px;">
+      {% for category, message in messages %}
+      <div class="alert alert-{{ category }}" style="margin-bottom: 8px; animation: slideIn 0.3s ease;">
+        {{ message }}
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+  {% endwith %}
+
+  <script>
+    function toggleSidebar() {
+      document.getElementById('sidebar').classList.toggle('show');
+      document.getElementById('sidebar-backdrop').classList.toggle('show');
+    }
+    async function logout() {
+      await fetch('/api/auth/logout', { method: 'POST' });
+      window.location.href = '/';
+    }
+  </script>
+
+  {% block content %}{% endblock %}
+
+  <!-- Footer -->
+  <footer class="site-footer">
+    <div class="footer-container">
+      <div class="footer-grid">
+        <div class="footer-col">
+          <a href="/" style="display: flex; align-items: center; gap: 10px; text-decoration: none; font-weight: 800; color: #1e293b; font-size: 18px; margin-bottom: 15px;">
+            <i class="fa-solid fa-shield-halved" style="color: #3b82f6; font-size: 20px;"></i>
+            <span>GARENA CHECKER</span>
+          </a>
+          <p style="color: #64748b; font-size: 12px; line-height: 1.6; margin: 0;">
+            Hệ thống kiểm tra tài khoản Garena Liên Quân Mobile. Tra cứu thông tin acc, skin, rank nhanh chóng. Mỗi tài khoản 100 lượt check/ngày.
+          </p>
+        </div>
+        <div class="footer-col">
+          <h4>Tính Năng</h4>
+          <div class="footer-links">
+            <a href="{{ url_for('dashboard') }}"><i class="fa-solid fa-angle-right" style="font-size:10px;"></i> Check Account</a>
+            <a href="{{ url_for('history_page') }}"><i class="fa-solid fa-angle-right" style="font-size:10px;"></i> Lịch Sử Check</a>
+            <a href="{{ url_for('register_page') }}"><i class="fa-solid fa-angle-right" style="font-size:10px;"></i> Đăng Ký Miễn Phí</a>
+          </div>
+        </div>
+        <div class="footer-col">
+          <h4>Liên Hệ</h4>
+          <div class="footer-links" style="gap:15px;">
+            <div class="footer-contact-item">
+              <i class="fa-solid fa-envelope" style="color:#3b82f6;"></i>
+              <span>support@garena-checker.com</span>
+            </div>
+            <div class="footer-contact-item">
+              <i class="fa-solid fa-clock" style="color:#3b82f6;"></i>
+              <span>Hỗ trợ trực tuyến 24/7</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="footer-copyright">
+        Garena Account Checker &copy; {{ now.year }}. All rights reserved.
+      </div>
+    </div>
+  </footer>
+
+  <style>
+    @keyframes slideIn {
+      from { transform: translateX(100%); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+  </style>
+  {% block extra_scripts %}{% endblock %}
+</body>
+</html>

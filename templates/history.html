@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+{% block title %}Lịch sử Check - Garena Checker{% endblock %}
+
+{% block content %}
+<main style="flex: 1; padding: 40px 20px;">
+  <div style="max-width: 1000px; margin: 0 auto;">
+    
+    <div style="display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start; justify-content: space-between; margin-bottom: 30px;">
+      <div>
+        <h2 style="font-weight: 800; color: #0f172a; margin: 0; font-size: 24px;">
+          <i class="fa-solid fa-clock-rotate-left" style="color: #f59e0b;"></i> Lịch sử kiểm tra
+        </h2>
+        <p style="color: #64748b; margin: 4px 0 0 0; font-size: 14px;">Danh sách tất cả các UID đã kiểm tra</p>
+      </div>
+      <a href="{{ url_for('index') }}" class="btn-primary"><i class="fa-solid fa-magnifying-glass"></i> Check Acc Mới</a>
+    </div>
+
+    <div style="background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden;">
+      <!-- Search -->
+      <div style="padding: 16px 20px; border-bottom: 1px solid #edf2f7; display: flex; gap: 12px; align-items: center;">
+        <div style="position: relative; flex: 1;">
+          <i class="fa-solid fa-search" style="position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: #94a3b8;"></i>
+          <input id="searchInput" type="text" placeholder="Tìm UID..." style="width: 100%; height: 40px; padding: 0 16px 0 40px; border-radius: 10px; border: 1.5px solid #e2e8f0; font-size: 13px; outline: none; box-sizing: border-box;">
+        </div>
+      </div>
+
+      <!-- Table -->
+      <div style="overflow-x: auto;">
+        <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+          <thead>
+            <tr style="background: #f8fafc; border-bottom: 2px solid #e2e8f0;">
+              <th style="padding: 12px 16px; text-align: left; font-weight: 700; color: #475569; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">#</th>
+              <th style="padding: 12px 16px; text-align: left; font-weight: 700; color: #475569; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">UID</th>
+              <th style="padding: 12px 16px; text-align: left; font-weight: 700; color: #475569; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Trạng thái</th>
+              <th style="padding: 12px 16px; text-align: left; font-weight: 700; color: #475569; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Thời gian</th>
+              <th style="padding: 12px 16px; text-align: center; font-weight: 700; color: #475569; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Chi tiết</th>
+            </tr>
+          </thead>
+          <tbody id="historyTableBody">
+            <tr><td colspan="5" style="padding: 40px; text-align: center; color: #94a3b8;">Đang tải...</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Pagination -->
+      <div style="padding: 16px 20px; border-top: 1px solid #edf2f7; display: flex; justify-content: space-between; align-items: center;">
+        <span style="font-size: 12px; color: #94a3b8;" id="pageInfo">Trang 1</span>
+        <div style="display: flex; gap: 8px;" id="paginationBtns"></div>
+      </div>
+    </div>
+
+    <!-- Detail Modal -->
+    <div id="detailModal" style="display: none; position: fixed; inset: 0; background: rgba(15,23,42,0.5); z-index: 20000; align-items: center; justify-content: center;" onclick="if(event.target===this)closeDetail()">
+      <div style="background: #fff; border-radius: 20px; padding: 30px; max-width: 700px; width: 90%; max-height: 80vh; overflow-y: auto; box-shadow: 0 25px 50px rgba(0,0,0,0.15);" onclick="event.stopPropagation()">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+          <h4 style="font-weight: 800; color: #0f172a; margin: 0;">Chi tiết kết quả</h4>
+          <button onclick="closeDetail()" style="background: none; border: none; font-size: 22px; cursor: pointer; color: #94a3b8;">&times;</button>
+        </div>
+        <div id="detailContent" style="font-size: 13px; line-height: 1.8; color: #334155;"></div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script>
+  let currentPage = 1;
+  let totalPages = 1;
+
+  async function loadHistory(page = 1) {
+    currentPage = page;
+    try {
+      const res = await fetch(`/api/history?page=${page}&per_page=20`);
+      const data = await res.json();
+
+      if (data.success) {
+        totalPages = data.pages;
+        document.getElementById('pageInfo').textContent = `Trang ${page}/${totalPages} (${data.total} kết quả)`;
+        renderPagination();
+        renderTable(data.data);
+      }
+    } catch (err) {
+      document.getElementById('historyTableBody').innerHTML = '<tr><td colspan="5" style="padding:40px;text-align:center;color:#ef4444;">Lỗi tải dữ liệu.</td></tr>';
+    }
+  }
+
+  function renderTable(items) {
+    const tbody = document.getElementById('historyTableBody');
+    if (items.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="5" style="padding:40px;text-align:center;color:#94a3b8;">Chưa có lịch sử check nào.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = items.map((h, i) => `
+      <tr style="border-bottom: 1px solid #f1f5f9; cursor: pointer;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background=''">
+        <td style="padding: 14px 16px; color: #94a3b8;">${(currentPage-1)*20 + i + 1}</td>
+        <td style="padding: 14px 16px; font-weight: 600; color: #0f172a; font-family: monospace;">${h.uid}</td>
+        <td style="padding: 14px 16px;">
+          <span style="font-size: 11px; font-weight: 600; padding: 2px 10px; border-radius: 20px; background: ${h.status==='success'?'#d1fae5':'#fee2e2'}; color: ${h.status==='success'?'#047857':'#b91c1c'};">
+            ${h.status === 'success' ? 'OK' : 'Lỗi'}
+          </span>
+        </td>
+        <td style="padding: 14px 16px; color: #64748b; font-size: 12px;">${h.created_at}</td>
+        <td style="padding: 14px 16px; text-align: center;">
+          <button onclick="event.stopPropagation(); showDetail(${h.id}, '${h.uid}')" style="background: #f1f5f9; border: none; padding: 6px 12px; border-radius: 8px; font-size: 12px; color: #3b82f6; font-weight: 600; cursor: pointer;">
+            <i class="fa-solid fa-eye"></i> Xem
+          </button>
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  function renderPagination() {
+    const container = document.getElementById('paginationBtns');
+    let html = '';
+    html += `<button onclick="loadHistory(${currentPage-1})" ${currentPage<=1?'disabled':''} style="padding:8px 14px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;cursor:pointer;font-size:13px;${currentPage<=1?'opacity:0.4':''}"><i class="fa-solid fa-chevron-left"></i></button>`;
+    for (let p = 1; p <= totalPages; p++) {
+      html += `<button onclick="loadHistory(${p})" style="padding:8px 14px;border:1px solid ${p===currentPage?'#3b82f6':'#e2e8f0'};border-radius:8px;background:${p===currentPage?'#3b82f6':'#fff'};color:${p===currentPage?'#fff':'#475569'};cursor:pointer;font-size:13px;font-weight:600;">${p}</button>`;
+    }
+    html += `<button onclick="loadHistory(${currentPage+1})" ${currentPage>=totalPages?'disabled':''} style="padding:8px 14px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;cursor:pointer;font-size:13px;${currentPage>=totalPages?'opacity:0.4':''}"><i class="fa-solid fa-chevron-right"></i></button>`;
+    container.innerHTML = html;
+  }
+
+  async function showDetail(id, uid) {
+    const modal = document.getElementById('detailModal');
+    const content = document.getElementById('detailContent');
+    content.innerHTML = '<p style="color:#94a3b8;">Đang tải...</p>';
+    modal.style.display = 'flex';
+
+    try {
+      const res = await fetch(`/api/history?per_page=100`);
+      const data = await res.json();
+      const item = data.data.find(h => h.id === id);
+      if (item && item.result_data) {
+        try {
+          const detail = JSON.parse(item.result_data);
+          let html = `<div style="background:#f8fafc;border-radius:12px;padding:16px;margin-bottom:12px;">
+            <strong>UID:</strong> <span style="font-family:monospace;color:#3b82f6;">${uid}</span>
+          </div>`;
+          for (const [k, v] of Object.entries(detail)) {
+            if (v === null || v === undefined || v === '' || k === 'uid') continue;
+            html += `<div style="display:flex;gap:8px;padding:8px 0;border-bottom:1px solid #f1f5f9;">
+              <span style="font-weight:600;min-width:130px;color:#64748b;font-size:11px;text-transform:uppercase;">${k.replace(/_/g,' ')}</span>
+              <span style="color:#0f172a;word-break:break-word;">${Array.isArray(v) ? v.join(', ') : v}</span>
+            </div>`;
+          }
+          content.innerHTML = html;
+        } catch (e) {
+          content.innerHTML = `<pre style="white-space:pre-wrap;font-size:12px;">${item.result_data}</pre>`;
+        }
+      } else {
+        content.innerHTML = '<p style="color:#94a3b8;">Không có dữ liệu chi tiết.</p>';
+      }
+    } catch (err) {
+      content.innerHTML = '<p style="color:#ef4444;">Lỗi tải dữ liệu.</p>';
+    }
+  }
+
+  function closeDetail() {
+    document.getElementById('detailModal').style.display = 'none';
+  }
+
+  document.getElementById('searchInput').addEventListener('input', function() {
+    const q = this.value.toLowerCase();
+    const rows = document.querySelectorAll('#historyTableBody tr');
+    rows.forEach(row => {
+      const uidCell = row.cells[1];
+      if (uidCell) {
+        row.style.display = uidCell.textContent.toLowerCase().includes(q) ? '' : 'none';
+      }
+    });
+  });
+
+  loadHistory();
+</script>
+{% endblock %}

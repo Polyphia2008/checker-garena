@@ -1,0 +1,198 @@
+{% extends "base.html" %}
+{% block title %}Quản lý Users - Admin{% endblock %}
+
+{% block content %}
+<main style="flex: 1; padding: 40px 20px;">
+  <div style="max-width: 1200px; margin: 0 auto;">
+    
+    <div style="display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start; justify-content: space-between; margin-bottom: 24px;">
+      <div>
+        <h2 style="font-weight: 800; color: #0f172a; margin: 0; font-size: 24px;">
+          <i class="fa-solid fa-users-gear" style="color: #3b82f6;"></i> Quản lý người dùng
+        </h2>
+      </div>
+      <a href="{{ url_for('admin_panel') }}" class="btn-outline"><i class="fa-solid fa-arrow-left"></i> Về Admin Panel</a>
+    </div>
+
+    <!-- Search -->
+    <div style="background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 16px 20px; margin-bottom: 20px; display: flex; gap: 12px; align-items: center;">
+      <div style="position: relative; flex: 1;">
+        <i class="fa-solid fa-search" style="position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: #94a3b8;"></i>
+        <input id="searchUsers" type="text" placeholder="Tìm username hoặc email..." style="width: 100%; height: 40px; padding: 0 16px 0 40px; border-radius: 10px; border: 1.5px solid #e2e8f0; font-size: 13px; outline: none; box-sizing: border-box;">
+      </div>
+      <button onclick="loadUsers()" class="btn-primary" style="height: 40px;"><i class="fa-solid fa-search"></i> Tìm</button>
+    </div>
+
+    <!-- Table -->
+    <div style="background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden;">
+      <div style="overflow-x: auto;">
+        <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+          <thead>
+            <tr style="background: #f8fafc; border-bottom: 2px solid #e2e8f0;">
+              <th style="padding: 12px 16px; text-align: left; font-weight: 700; color: #475569; font-size: 11px; text-transform: uppercase;">ID</th>
+              <th style="padding: 12px 16px; text-align: left; font-weight: 700; color: #475569; font-size: 11px; text-transform: uppercase;">Username</th>
+              <th style="padding: 12px 16px; text-align: left; font-weight: 700; color: #475569; font-size: 11px; text-transform: uppercase;">Email</th>
+              <th style="padding: 12px 16px; text-align: center; font-weight: 700; color: #475569; font-size: 11px; text-transform: uppercase;">Checks Today</th>
+              <th style="padding: 12px 16px; text-align: center; font-weight: 700; color: #475569; font-size: 11px; text-transform: uppercase;">Limit</th>
+              <th style="padding: 12px 16px; text-align: center; font-weight: 700; color: #475569; font-size: 11px; text-transform: uppercase;">Admin</th>
+              <th style="padding: 12px 16px; text-align: center; font-weight: 700; color: #475569; font-size: 11px; text-transform: uppercase;">Active</th>
+              <th style="padding: 12px 16px; text-align: center; font-weight: 700; color: #475569; font-size: 11px; text-transform: uppercase;">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="usersTableBody">
+            <tr><td colspan="8" style="padding: 40px; text-align: center; color: #94a3b8;">Đang tải...</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div style="padding: 16px 20px; border-top: 1px solid #edf2f7; display: flex; justify-content: space-between; align-items: center;">
+        <span style="font-size: 12px; color: #94a3b8;" id="userPageInfo">Trang 1</span>
+        <div style="display: flex; gap: 8px;" id="userPaginationBtns"></div>
+      </div>
+    </div>
+
+    <!-- Edit Modal -->
+    <div id="editModal" style="display: none; position: fixed; inset: 0; background: rgba(15,23,42,0.5); z-index: 20000; align-items: center; justify-content: center;" onclick="if(event.target===this)closeEdit()">
+      <div style="background: #fff; border-radius: 20px; padding: 30px; max-width: 500px; width: 90%; box-shadow: 0 25px 50px rgba(0,0,0,0.15);" onclick="event.stopPropagation()">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+          <h4 style="font-weight: 800; color: #0f172a; margin: 0;">Chỉnh sửa User #<span id="editUserId"></span></h4>
+          <button onclick="closeEdit()" style="background: none; border: none; font-size: 22px; cursor: pointer; color: #94a3b8;">&times;</button>
+        </div>
+        <form id="editForm" onsubmit="saveUser(event)">
+          <div style="margin-bottom: 14px;">
+            <label style="font-size: 12px; font-weight: 700; color: #64748b; display: block; margin-bottom: 4px;">Limit/ngày</label>
+            <input name="daily_limit" type="number" min="1" style="width: 100%; height: 40px; padding: 0 14px; border-radius: 10px; border: 1.5px solid #e2e8f0; font-size: 13px; outline: none; box-sizing: border-box;">
+          </div>
+          <div style="margin-bottom: 14px;">
+            <label style="font-size: 12px; font-weight: 700; color: #64748b; display: block; margin-bottom: 4px;">Checks Today</label>
+            <input name="checks_today" type="number" min="0" style="width: 100%; height: 40px; padding: 0 14px; border-radius: 10px; border: 1.5px solid #e2e8f0; font-size: 13px; outline: none; box-sizing: border-box;">
+          </div>
+          <div style="margin-bottom: 14px; display: flex; gap: 16px;">
+            <label style="display: flex; align-items: center; gap: 6px; font-size: 13px; color: #475569; cursor: pointer;">
+              <input type="checkbox" name="is_admin" style="accent-color: #3b82f6;"> Admin
+            </label>
+            <label style="display: flex; align-items: center; gap: 6px; font-size: 13px; color: #475569; cursor: pointer;">
+              <input type="checkbox" name="is_active" checked style="accent-color: #3b82f6;"> Active
+            </label>
+          </div>
+          <div style="display: flex; gap: 12px;">
+            <button type="submit" class="btn-primary" style="flex: 1; height: 40px; justify-content: center;">Lưu thay đổi</button>
+            <button type="button" onclick="closeEdit()" class="btn-outline" style="flex: 1; height: 40px; justify-content: center;">Hủy</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script>
+  let userPage = 1;
+  let userTotalPages = 1;
+  let editingUserId = null;
+
+  async function loadUsers(page = 1) {
+    userPage = page;
+    const search = document.getElementById('searchUsers').value.trim();
+    try {
+      const res = await fetch(`/api/admin/users?page=${page}&per_page=15&search=${encodeURIComponent(search)}`);
+      const data = await res.json();
+      if (data.success) {
+        userTotalPages = data.pages;
+        document.getElementById('userPageInfo').textContent = `Trang ${page}/${userTotalPages} (${data.total} users)`;
+        renderUserPagination();
+        renderUserTable(data.data);
+      }
+    } catch (err) {}
+  }
+
+  function renderUserTable(users) {
+    const tbody = document.getElementById('usersTableBody');
+    if (users.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="8" style="padding:40px;text-align:center;color:#94a3b8;">Không tìm thấy user.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = users.map(u => `
+      <tr style="border-bottom: 1px solid #f1f5f9;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background=''">
+        <td style="padding: 12px 16px; color: #94a3b8; font-family: monospace;">${u.id}</td>
+        <td style="padding: 12px 16px; font-weight: 600; color: #0f172a;">${u.username}</td>
+        <td style="padding: 12px 16px; color: #64748b; font-size: 12px;">${u.email}</td>
+        <td style="padding: 12px 16px; text-align: center; font-weight: 600;">${u.checks_today}</td>
+        <td style="padding: 12px 16px; text-align: center; font-weight: 600;">${u.daily_limit}</td>
+        <td style="padding: 12px 16px; text-align: center;">
+          <span style="font-size: 11px; padding: 2px 8px; border-radius: 10px; background: ${u.is_admin?'#fef3c7':'#f1f5f9'}; color: ${u.is_admin?'#92400e':'#94a3b8'}; font-weight: 600;">
+            ${u.is_admin ? 'Yes' : 'No'}
+          </span>
+        </td>
+        <td style="padding: 12px 16px; text-align: center;">
+          <span style="font-size: 11px; padding: 2px 8px; border-radius: 10px; background: ${u.is_active?'#d1fae5':'#fee2e2'}; color: ${u.is_active?'#047857':'#b91c1c'}; font-weight: 600;">
+            ${u.is_active ? 'Active' : 'Banned'}
+          </span>
+        </td>
+        <td style="padding: 12px 16px; text-align: center;">
+          <button onclick="openEdit(${u.id}, '${u.username}', ${u.daily_limit}, ${u.checks_today}, ${u.is_admin ? 'true' : 'false'}, ${u.is_active ? 'true' : 'false'})" style="background: #f1f5f9; border: none; padding: 6px 12px; border-radius: 8px; font-size: 12px; color: #3b82f6; font-weight: 600; cursor: pointer;">
+            <i class="fa-solid fa-pen-to-square"></i> Sửa
+          </button>
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  function renderUserPagination() {
+    const container = document.getElementById('userPaginationBtns');
+    let html = '';
+    html += `<button onclick="loadUsers(${userPage-1})" ${userPage<=1?'disabled':''} style="padding:8px 14px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;cursor:pointer;font-size:13px;${userPage<=1?'opacity:0.4':''}"><i class="fa-solid fa-chevron-left"></i></button>`;
+    for (let p = 1; p <= userTotalPages && p <= 10; p++) {
+      html += `<button onclick="loadUsers(${p})" style="padding:8px 14px;border:1px solid ${p===userPage?'#3b82f6':'#e2e8f0'};border-radius:8px;background:${p===userPage?'#3b82f6':'#fff'};color:${p===userPage?'#fff':'#475569'};cursor:pointer;font-size:13px;font-weight:600;">${p}</button>`;
+    }
+    html += `<button onclick="loadUsers(${userPage+1})" ${userPage>=userTotalPages?'disabled':''} style="padding:8px 14px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;cursor:pointer;font-size:13px;${userPage>=userTotalPages?'opacity:0.4':''}"><i class="fa-solid fa-chevron-right"></i></button>`;
+    container.innerHTML = html;
+  }
+
+  function openEdit(id, username, daily_limit, checks_today, is_admin, is_active) {
+    editingUserId = id;
+    document.getElementById('editUserId').textContent = id;
+    const form = document.getElementById('editForm');
+    form.daily_limit.value = daily_limit;
+    form.checks_today.value = checks_today;
+    form.is_admin.checked = is_admin === 'true' || is_admin === true;
+    form.is_active.checked = is_active === 'true' || is_active === true;
+    document.getElementById('editModal').style.display = 'flex';
+  }
+
+  function closeEdit() {
+    document.getElementById('editModal').style.display = 'none';
+    editingUserId = null;
+  }
+
+  async function saveUser(e) {
+    e.preventDefault();
+    const form = e.target;
+    try {
+      const res = await fetch(`/api/admin/user/${editingUserId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          daily_limit: parseInt(form.daily_limit.value),
+          checks_today: parseInt(form.checks_today.value),
+          is_admin: form.is_admin.checked,
+          is_active: form.is_active.checked,
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        closeEdit();
+        loadUsers(userPage);
+      } else {
+        alert(data.error);
+      }
+    } catch (err) {
+      alert('Lỗi kết nối!');
+    }
+  }
+
+  document.getElementById('searchUsers').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') loadUsers();
+  });
+
+  loadUsers();
+</script>
+{% endblock %}

@@ -1,0 +1,55 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual Environment
+venv/
+env/
+.venv/
+
+# Database
+*.db
+*.sqlite3
+*.sqlite
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+*.env
+
+# PM2
+.pm2/
+pids/
+logs/
+*.log
+
+# Backup
+*.backup
+*.bak
+*.tar.gz
+*.zip
+
+# Playwright
+.playwright/
+
+# Mac
+__MACOSX/
+.DS_Store
+
+# Temp
+/tmp/
+*.tmp
