@@ -49,9 +49,9 @@ if ($remaining <= 0) {
     ]);
 }
 
-$cmd = escapeshellarg(MinhNhatdev_PYTHON) . ' ' . escapeshellarg(MinhNhatdev_BACKEND)
+$cmd = escapeshellarg(Minhnhatdev_PYTHON) . ' ' . escapeshellarg(Minhnhatdev_BACKEND)
     . ' ' . escapeshellarg($account) . ' ' . escapeshellarg($password);
-$cmd = 'cd ' . escapeshellarg(dirname(MinhNhatdev_BACKEND)) . ' && timeout ' . Minhnhatdev_CHECK_TIMEOUT . ' ' . $cmd . ' 2>/dev/null';
+$cmd = 'cd ' . escapeshellarg(dirname(Minhnhatdev_BACKEND)) . ' && timeout ' . Minhnhatdev_CHECK_TIMEOUT . ' ' . $cmd . ' 2>/dev/null';
 
 $raw = shell_exec($cmd);
 $raw = trim((string)$raw);
