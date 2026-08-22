@@ -54,3 +54,5 @@ __MACOSX/
 /tmp/
 *.tmp
 gcp.sh
+php_server.log
+res/
