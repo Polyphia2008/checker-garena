@@ -53,3 +53,4 @@ __MACOSX/
 # Temp
 /tmp/
 *.tmp
+gcp.sh
