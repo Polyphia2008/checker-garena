@@ -56,3 +56,6 @@ __MACOSX/
 gcp.sh
 php_server.log
 res/
+backend/bulk_jobs/
+backend/proxies.txt
+backend/proxy_enabled.flag
