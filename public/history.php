@@ -25,15 +25,15 @@ Minhnhatdev_page_head('Lịch Sử Check');
 <div class="card-verify" style="max-width: 960px; text-align: left;">
   <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:20px;">
     <h3 style="font-weight: 800; color: #0f172a; margin: 0; font-size: 20px; display:flex; align-items:center; gap:8px;">
-      <i class="ki-filled ki-time text-primary" style="font-size:22px;"></i> Lịch Sử Check Của Bạn
+      <span style="color:#3b82f6; display:inline-flex;"><?= Minhnhatdev_icon('time', '', 22) ?></span> Lịch Sử Check Của Bạn
     </h3>
-    <a href="/index.php" class="btn-submit" style="text-decoration:none; height:38px; font-size:13px;"><i class="ki-filled ki-shield-search"></i> Check tài khoản mới</a>
+    <a href="/index.php" class="btn-submit" style="text-decoration:none; height:38px; font-size:13px;"><?= Minhnhatdev_icon('shield-search', '', 15) ?> Check tài khoản mới</a>
   </div>
 
   <?php if (!$logs): ?>
-  <div class="Minhnhatdev-alert Minhnhatdev-alert-ok"><i class="ki-filled ki-information-2"></i> Bạn chưa check tài khoản nào. <a href="/index.php" style="font-weight:800;">Bắt đầu ngay!</a></div>
+  <div class="Minhnhatdev-alert Minhnhatdev-alert-ok"><?= Minhnhatdev_icon('info', '', 16) ?> Bạn chưa check tài khoản nào. <a href="/index.php" style="font-weight:800;">Bắt đầu ngay!</a></div>
   <?php else: ?>
-  <div style="overflow-x:auto; border:1px solid #e2e8f0; border-radius:14px;">
+  <div class="Minhnhatdev-table-wrap" style="border:1px solid #e2e8f0; border-radius:14px;">
     <table class="Minhnhatdev-table">
       <thead>
         <tr>
@@ -60,10 +60,10 @@ Minhnhatdev_page_head('Lịch Sử Check');
             <?php if ($log['status'] === 'HIT' && $log['result_line']): ?>
             <button type="button" class="btn-submit" style="height:28px; padding:0 12px; font-size:11px;"
               onclick='MinhnhatdevShowLine(<?= json_encode($log["result_line"], JSON_UNESCAPED_UNICODE | JSON_HEX_APOS | JSON_HEX_QUOT) ?>)'>
-              <i class="ki-filled ki-eye"></i> Xem
+              <?= Minhnhatdev_icon('eye', '', 13) ?> Xem
             </button>
             <?php elseif ($log['detail']): ?>
-            <span title="<?= e($log['detail']) ?>" style="cursor:help; color:#94a3b8;"><i class="ki-filled ki-information-2"></i></span>
+            <span title="<?= e($log['detail']) ?>" style="cursor:help; color:#94a3b8; display:inline-flex;"><?= Minhnhatdev_icon('info', '', 16) ?></span>
             <?php endif; ?>
           </td>
         </tr>
@@ -86,10 +86,10 @@ Minhnhatdev_page_head('Lịch Sử Check');
   <div style="background:#fff; border-radius:20px; padding:24px; max-width:900px; width:100%; max-height:80vh; overflow:auto;">
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
       <strong style="color:#0f172a; font-size:15px;">Kết quả chi tiết</strong>
-      <button onclick="document.getElementById('MinhnhatdevModal').style.display='none'" style="background:none; border:none; cursor:pointer; color:#64748b;"><i class="ki-filled ki-cross fs-3"></i></button>
+      <button onclick="document.getElementById('MinhnhatdevModal').style.display='none'" style="background:none; border:none; cursor:pointer; color:#64748b; display:inline-flex;"><?= Minhnhatdev_icon('cross', '', 20) ?></button>
     </div>
     <div id="MinhnhatdevModalBody" class="Minhnhatdev-hitline"></div>
-    <button type="button" class="btn-submit" style="margin-top:14px; height:36px; font-size:12px;" onclick="MinhnhatdevCopyModal()"><i class="ki-filled ki-copy"></i> Copy</button>
+    <button type="button" class="btn-submit" style="margin-top:14px; height:36px; font-size:12px;" onclick="MinhnhatdevCopyModal()"><?= Minhnhatdev_icon('copy', '', 14) ?> Copy</button>
   </div>
 </div>
 
@@ -99,7 +99,7 @@ function MinhnhatdevShowLine(line) {
   document.getElementById('MinhnhatdevModal').style.display = 'flex';
 }
 function MinhnhatdevCopyModal() {
-  navigator.clipboard.writeText(document.getElementById('MinhnhatdevModalBody').textContent).then(function(){ alert('Đã copy!'); });
+  navigator.clipboard.writeText(document.getElementById('MinhnhatdevModalBody').textContent).then(function(){ MinhnhatdevToast('Đã copy kết quả!', 'success'); });
 }
 </script>
 <?php Minhnhatdev_page_foot(); ?>
