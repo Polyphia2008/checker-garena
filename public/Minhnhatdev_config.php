@@ -159,7 +159,7 @@ function Minhnhatdev_proxy_path(): string {
 }
 
 function Minhnhatdev_proxy_is_enabled(): bool {
-    return is_file(Minhnhatdev_proxy_flag());
+    return is_file(Minhnhatdev_proxy_flag_path());
 }
 
 function Minhnhatdev_proxy_set_enabled(bool $on): void {
