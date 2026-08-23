@@ -38,3 +38,7 @@ function Minhnhatdev_icon(string $name, string $class = '', int $size = 18): str
 function Minhnhatdev_icon_toast(string $name): string {
     return Minhnhatdev_icon($name, '', 18);
 }
+
+function Minhnhatdev_icon_js(string $name, int $size = 18): string {
+    return json_encode(Minhnhatdev_icon($name, '', $size));
+}

@@ -7,6 +7,9 @@ define('Minhnhatdev_DAILY_LIMIT', 100);
 define('Minhnhatdev_BACKEND', '/home/user/webapp/backend/Minhnhatdev_api.py');
 define('Minhnhatdev_PYTHON', '/usr/local/bin/python3');
 define('Minhnhatdev_CHECK_TIMEOUT', 240);
+define('Minhnhatdev_PROXY_FILE', '/home/user/webapp/backend/proxies.txt');
+define('Minhnhatdev_PROXY_ENABLED', '/home/user/webapp/backend/proxy_enabled.flag');
+define('Minhnhatdev_BULK_DIR', '/home/user/webapp/backend/bulk_jobs');
 
 session_name('Minhnhatdev_sess');
 if (session_status() === PHP_SESSION_NONE) {
@@ -139,4 +142,57 @@ function Minhnhatdev_csrf_verify(): void {
 
 function e(?string $s): string {
     return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
+}
+
+function Minhnhatdev_proxy_count(): int {
+    if (!is_file(Minhnhatdev_proxy_path())) return 0;
+    $n = 0;
+    foreach (file(Minhnhatdev_proxy_path(), FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: [] as $line) {
+        $line = trim($line);
+        if ($line !== '' && $line[0] !== '#') $n++;
+    }
+    return $n;
+}
+
+function Minhnhatdev_proxy_path(): string {
+    return Minhnhatdev_PROXY_FILE;
+}
+
+function Minhnhatdev_proxy_is_enabled(): bool {
+    return is_file(Minhnhatdev_proxy_flag());
+}
+
+function Minhnhatdev_proxy_set_enabled(bool $on): void {
+    $flag = Minhnhatdev_proxy_flag_path();
+    if ($on) {
+        @file_put_contents($flag, '1');
+    } else {
+        @unlink($flag);
+    }
+}
+
+function Minhnhatdev_proxy_flag_path(): string {
+    return Minhnhatdev_PROXY_ENABLED;
+}
+
+function Minhnhatdev_proxy_read(): string {
+    return is_file(Minhnhatdev_proxy_path()) ? (string)file_get_contents(Minhnhatdev_proxy_path()) : '';
+}
+
+function Minhnhatdev_proxy_save(string $content): int {
+    $lines = preg_split('/\r\n|\r|\n/', $content);
+    $clean = [];
+    foreach ($lines as $line) {
+        $line = trim($line);
+        if ($line === '' || $line[0] === '#') continue;
+        $clean[] = $line;
+    }
+    @file_put_contents(Minhnhatdev_proxy_path(), implode("\n", $clean) . (count($clean) ? "\n" : ''));
+    return count($clean);
+}
+
+function Minhnhatdev_proxy_active_file(): string {
+    if (!Minhnhatdev_proxy_is_enabled()) return '';
+    if (Minhnhatdev_proxy_count() <= 0) return '';
+    return Minhnhatdev_proxy_path();
 }
