@@ -2532,19 +2532,46 @@ _KGCAMP_ORIGINS = (
     "https://kgvn-camp.mobagarena.com",
     "https://kg-camp.mobagarena.com",
 )
-# roleJob / gradeLevel id → tên rank (đồng bộ weeklyreport rank_config — authoritative;
-# 22 = T.Anh V, 27 = Cao Thủ, 28 = Chiến Tướng đã xác nhận từ dữ liệu thật)
+# roleJob / gradeLevel id → tên rank (đồng bộ weeklyreport rank_config & AOV Camp protocol 1-40)
 _AOV_ROLEJOB_NAME = {
+    0: "Chưa có",
     1: "Chưa có",
+    # Đồng (Bronze)
     2: "Đồng III", 3: "Đồng II", 4: "Đồng I",
+    # Bạc (Silver)
     5: "Bạc III", 6: "Bạc II", 7: "Bạc I",
+    # Vàng (Gold)
     8: "Vàng IV", 9: "Vàng III", 10: "Vàng II", 11: "Vàng I",
-    12: "B.Kim V", 13: "B.Kim IV", 14: "B.Kim III", 15: "B.Kim II", 16: "B.Kim I",
-    17: "K.Cương V", 18: "K.Cương IV", 19: "K.Cương III", 20: "K.Cương II", 21: "K.Cương I",
-    22: "T.Anh V", 23: "T.Anh IV", 24: "T.Anh III", 25: "T.Anh II", 26: "T.Anh I",
+    # Bạch Kim (Platinum)
+    12: "Bạch Kim V", 13: "Bạch Kim IV", 14: "Bạch Kim III",
+    # Tinh Anh / Kim Cương boundaries
+    15: "Tinh Anh V", 16: "Tinh Anh IV", 17: "Tinh Anh III", 18: "Tinh Anh II", 19: "Tinh Anh I",
+    # Kim Cương / Tinh Anh alternate MSDK mappings
+    20: "Tinh Anh V", 21: "Tinh Anh IV", 22: "Tinh Anh III", 23: "Tinh Anh II", 24: "Tinh Anh I",
+    # Master / Supreme / Challenger
+    25: "Cao Thủ", 26: "Chiến Tướng",
     27: "Cao Thủ", 28: "Chiến Tướng", 29: "Chiến Thần", 30: "Thách Đấu",
-    31: "Chiến Thần", 32: "Thách Đấu",
+    # Extended & Season / Peak Tournament
+    31: "Chiến Thần", 32: "Thách Đấu", 33: "Thách Đấu", 34: "Đỉnh Cao",
+    35: "Đấu Đỉnh Cao I", 36: "Đấu Đỉnh Cao II", 37: "Đấu Đỉnh Cao III",
+    38: "Đấu Đỉnh Cao IV", 39: "Đấu Đỉnh Cao V", 40: "Thần Thoại",
 }
+
+
+def _pick_credit_score(*sources):
+    for src in sources:
+        if not isinstance(src, dict):
+            continue
+        for k in ("creditScore", "credit_score", "credit", "reputationScore", "reputation", "score", "reputation_score"):
+            v = src.get(k)
+            if v is not None and str(v).strip() != "":
+                try:
+                    iv = int(float(v))
+                    if 0 <= iv <= 100:
+                        return iv
+                except Exception:
+                    pass
+    return None
 
 
 def _parse_kgcamp_rank_payload(data) -> dict:
@@ -2634,6 +2661,94 @@ def _parse_kgcamp_rank_payload(data) -> dict:
     if isinstance(char_name, str):
         char_name = char_name.strip()
 
+    # Chiến tích tổng All-Time (6691 trận, 54.9% winrate)
+    pvp_num = 0
+    for pk in ("pvpNum", "pvp_num", "totalBattleNum", "total_battle_num", "totalBattles", "battles"):
+        if ugi.get(pk) is not None or role.get(pk) is not None:
+            try:
+                pvp_num = int(ugi.get(pk) if ugi.get(pk) is not None else role.get(pk))
+                if pvp_num > 0:
+                    break
+            except Exception:
+                pass
+
+    pvp_win_num = 0
+    for wk in ("pvpWinNum", "pvp_win_num", "winBattleNum", "win_battle_num", "winBattles", "wins"):
+        if ugi.get(wk) is not None or role.get(wk) is not None:
+            try:
+                pvp_win_num = int(ugi.get(wk) if ugi.get(wk) is not None else role.get(wk))
+                if pvp_win_num > 0:
+                    break
+            except Exception:
+                pass
+
+    all_time_wr = 0.0
+    if pvp_num > 0 and pvp_win_num > 0:
+        all_time_wr = round((pvp_win_num / pvp_num) * 100, 1)
+
+    popularity = ugi.get("popularity") or role.get("popularity") or ugi.get("hot") or 0
+    likes = ugi.get("likeNum") or role.get("likeNum") or ugi.get("likes") or 0
+
+    # Bang hội / Clan & Chức vụ
+    clan_name = (
+        ugi.get("guildName")
+        or ugi.get("guild_name")
+        or ugi.get("clanName")
+        or ugi.get("clan_name")
+        or role.get("guildName")
+        or role.get("guild_name")
+        or ""
+    )
+    clan_name = str(clan_name).strip() if clan_name else ""
+
+    clan_role = (
+        ugi.get("guildRole")
+        or ugi.get("guild_role")
+        or ugi.get("clanRole")
+        or ugi.get("clan_role")
+        or ugi.get("guildPosition")
+        or role.get("guildRole")
+        or ""
+    )
+    clan_role = str(clan_role).strip() if clan_role else ""
+
+    # Quan hệ Tri Kỷ / Intimacy (Cặp đôi, Bạn thân, Điểm thân mật, Số ngày)
+    intimacy_list = []
+    raw_intim = (
+        ugi.get("intimacyList")
+        or role.get("intimacyList")
+        or ugi.get("relations")
+        or role.get("relations")
+        or ugi.get("triKy")
+        or role.get("triKy")
+        or ugi.get("intimacy")
+        or role.get("intimacy")
+        or []
+    )
+    if isinstance(raw_intim, list):
+        for itm in raw_intim:
+            if isinstance(itm, dict):
+                r_name = str(itm.get("relationName") or itm.get("relation_type") or itm.get("type") or "Tri Kỷ").strip()
+                t_name = str(itm.get("targetName") or itm.get("roleName") or itm.get("name") or itm.get("nickName") or "").strip()
+                val = str(itm.get("intimacyValue") or itm.get("score") or itm.get("intimacyScore") or itm.get("level") or "").strip()
+                days = str(itm.get("intimacyDays") or itm.get("days") or itm.get("intimacy_days") or "").strip()
+                
+                details = []
+                if val:
+                    details.append(f"{val} điểm" if val.isdigit() and int(val) > 100 else f"Lv.{val}")
+                if days:
+                    details.append(f"{days} ngày")
+                
+                det_str = f" ({' - '.join(details)})" if details else ""
+                if t_name:
+                    intimacy_list.append(f"{r_name}: {t_name}{det_str}")
+            elif isinstance(itm, str) and itm.strip():
+                intimacy_list.append(itm.strip())
+
+    # Logic World / Server
+    world_id = ugi.get("logicWorldId") or ugi.get("logic_world_id") or role.get("logicWorldId") or ""
+    server_name = ugi.get("serverName") or ugi.get("server_name") or role.get("serverName") or ""
+
     if name or stars or job_id:
         out["rank"] = name
         out["rank_stars"] = stars if stars > 0 else 0
@@ -2641,23 +2756,38 @@ def _parse_kgcamp_rank_payload(data) -> dict:
         out["role_job_icon"] = str(icon or "")
         if char_name:
             out["name"] = char_name
+        if pvp_num > 0:
+            out["all_time_battles"] = pvp_num
+            out["all_time_wins"] = pvp_win_num
+            out["all_time_winrate"] = all_time_wr
+        if popularity:
+            out["popularity"] = popularity
+        if likes:
+            out["likes"] = likes
+        if clan_name:
+            out["clan_name"] = clan_name
+        if clan_role:
+            out["clan_role"] = clan_role
+        if intimacy_list:
+            out["intimacy"] = intimacy_list
+        if world_id:
+            out["logic_world_id"] = str(world_id)
+        if server_name:
+            out["server_name"] = str(server_name)
         out["_source"] = "kgcamp"
         out["_raw_ugi"] = ugi
     _cr = _pick_credit_score(ugi, role, root, data)
     if _cr is not None:
         out["credit"] = _cr
+        out["aov_credit"] = _cr
         out["_credit_source"] = "kgcamp"
     return out
 
 
 def _parse_kgcamp_season(data) -> dict:
     """
-    Parse season/detail (rank mùa) → gradeLevel, gradeStar, winRate, battles, mvp, top heroes.
-    Shape: {code:0, data:{gradeLevel, gradeLevelName(obfuscated), gradeLevelIcon,
-                          gradeStar, totalBattleNum, winBattleNum, winRate, mvpBattleNum,
-                          commonHero:[{heroId, heroName(obf), heroCover, winRate, maxKda,
-                                       maxKdaKills, maxKdaDeaths, maxKdaAssists, sort,
-                                       winBattleNum, battleNum}], useHeroNum}}
+    Parse season/detail (rank mùa + vinh danh) → gradeLevel, gradeStar, winRate, battles, mvp, top heroes.
+    Trích xuất toàn diện mọi biến thể key payload từ Tencent / Garena Camp API.
     """
     if not isinstance(data, dict):
         return {}
@@ -2665,60 +2795,163 @@ def _parse_kgcamp_season(data) -> dict:
     if not isinstance(root, dict):
         return {}
 
-    grade = root.get("gradeLevel")
-    try:
-        grade_id = int(grade) if grade is not None else 0
-    except (TypeError, ValueError):
-        grade_id = 0
-
-    grade_name = (root.get("gradeLevelName") or "").strip()
-    # tên rank đôi khi bị mã hoá ("45D81FA5309BDF03_##") → map theo gradeLevel
-    if not grade_name or re.fullmatch(r"[0-9A-Fa-f]{6,}_?#*", grade_name) is not None:
-        grade_name = _AOV_ROLEJOB_NAME.get(grade_id, "")
-
     def _i(v):
         try:
-            return int(v)
+            return int(float(v)) if v is not None and str(v).strip() != "" else 0
         except (TypeError, ValueError):
             return 0
 
+    grade = root.get("gradeLevel")
+    if grade is None:
+        grade = root.get("grade_level") or root.get("roleJob") or root.get("role_job") or root.get("rankId") or root.get("rank_id")
+    try:
+        grade_id = int(grade) if grade is not None and str(grade).strip() != "" else 0
+    except (TypeError, ValueError):
+        grade_id = 0
+
+    grade_name = (
+        root.get("gradeLevelName")
+        or root.get("grade_level_name")
+        or root.get("roleJobName")
+        or root.get("role_job_name")
+        or root.get("rankName")
+        or root.get("rank_name")
+        or ""
+    )
+    grade_name = str(grade_name).strip() if grade_name else ""
+    if not grade_name or re.fullmatch(r"[0-9A-Fa-f]{6,}_?#*", grade_name) is not None:
+        grade_name = _AOV_ROLEJOB_NAME.get(grade_id, "")
+
+    stars = 0
+    for sk in ("gradeStar", "grade_star", "rankGradeStar", "rank_grade_star", "rankStar", "rank_star", "star", "stars"):
+        if root.get(sk) is not None:
+            stars = _i(root.get(sk))
+            break
+
+    battles = 0
+    for bk in ("totalBattleNum", "total_battle_num", "totalBattles", "total_battles", "battleNum", "battle_num", "battles", "totalBattle", "total_battle", "pvpNum", "pvp_num"):
+        if root.get(bk) is not None:
+            battles = _i(root.get(bk))
+            if battles > 0:
+                break
+    if not battles:
+        battles = _i(root.get("totalBattleNum"))
+
+    wins = 0
+    for wk in ("winBattleNum", "win_battle_num", "winBattles", "win_battles", "winNum", "win_num", "wins", "winBattle", "win_battle"):
+        if root.get(wk) is not None:
+            wins = _i(root.get(wk))
+            if wins > 0:
+                break
+    if not wins:
+        wins = _i(root.get("winBattleNum"))
+
+    mvp = 0
+    for mk in ("mvpBattleNum", "mvp_battle_num", "mvpBattles", "mvp_battles", "mvpNum", "mvp_num", "mvp", "mvpBattle", "mvp_battle"):
+        if root.get(mk) is not None:
+            mvp = _i(root.get(mk))
+            if mvp > 0:
+                break
+    if not mvp:
+        mvp = _i(root.get("mvpBattleNum"))
+
+    win_rate = None
+    for rk in ("winRate", "win_rate", "winrate", "win_rate_str", "winRateStr"):
+        if root.get(rk) is not None:
+            raw_wr = root.get(rk)
+            try:
+                if isinstance(raw_wr, str):
+                    raw_wr_clean = raw_wr.replace("%", "").strip()
+                    win_rate = float(raw_wr_clean)
+                else:
+                    win_rate = float(raw_wr)
+                if 0 < win_rate <= 1.0 and battles > 0:
+                    win_rate = round(win_rate * 100, 2)
+                break
+            except Exception:
+                continue
+
+    if win_rate is None and battles > 0:
+        if wins > 0:
+            win_rate = round((wins / battles) * 100, 2)
+        else:
+            win_rate = 0.0
+
     heroes = []
-    ch = root.get("commonHero")
+    ch = None
+    for hk in ("commonHero", "common_hero", "commonHeroes", "common_heroes", "heroList", "hero_list", "heroes", "topHeroes"):
+        if isinstance(root.get(hk), list):
+            ch = root.get(hk)
+            break
     if isinstance(ch, list):
         for h in ch:
             if not isinstance(h, dict):
                 continue
+            hid = h.get("heroId") if h.get("heroId") is not None else (h.get("hero_id") or h.get("id"))
+            hname = (h.get("heroName") or h.get("hero_name") or h.get("name") or "").strip()
+            hcover = h.get("heroCover") or h.get("hero_cover") or h.get("cover") or h.get("icon") or ""
+            
+            h_wr = h.get("winRate") if h.get("winRate") is not None else (h.get("win_rate") or h.get("winrate"))
+            h_wr_val = 0.0
+            try:
+                if isinstance(h_wr, str):
+                    h_wr_val = float(h_wr.replace("%", "").strip())
+                elif h_wr is not None:
+                    h_wr_val = float(h_wr)
+                if 0 < h_wr_val <= 1.0:
+                    h_wr_val = round(h_wr_val * 100, 2)
+            except Exception:
+                h_wr_val = 0.0
+
+            h_battles = _i(h.get("battleNum") if h.get("battleNum") is not None else (h.get("battle_num") or h.get("battles") or h.get("totalBattleNum")))
+            h_wins = _i(h.get("winBattleNum") if h.get("winBattleNum") is not None else (h.get("win_battle_num") or h.get("wins")))
+            if not h_wr_val and h_battles > 0 and h_wins > 0:
+                h_wr_val = round((h_wins / h_battles) * 100, 2)
+
             heroes.append({
-                "hero_id": h.get("heroId"),
-                "hero_name": (h.get("heroName") or "").strip(),
-                "hero_cover": h.get("heroCover") or "",
-                "win_rate": h.get("winRate"),
-                "kda": h.get("maxKda"),
-                "kills": h.get("maxKdaKills"),
-                "deaths": h.get("maxKdaDeaths"),
-                "assists": h.get("maxKdaAssists"),
-                "battles": h.get("battleNum"),
-                "wins": h.get("winBattleNum"),
+                "hero_id": hid,
+                "hero_name": hname,
+                "hero_cover": hcover,
+                "win_rate": h_wr_val,
+                "kda": h.get("maxKda") or h.get("kda"),
+                "kills": h.get("maxKdaKills") or h.get("kills"),
+                "deaths": h.get("maxKdaDeaths") or h.get("deaths"),
+                "assists": h.get("maxKdaAssists") or h.get("assists"),
+                "battles": h_battles,
+                "wins": h_wins,
             })
 
+    ladder_battles = _i(root.get("ladderBattleNum") or root.get("ladder_battle_num") or root.get("rankedBattleNum") or root.get("rankBattleNum") or 0)
+    ladder_wins = _i(root.get("ladderWinBattleNum") or root.get("ladder_win_battle_num") or root.get("rankedWinNum") or root.get("rankWinNum") or 0)
+    ladder_wr = round((ladder_wins / ladder_battles) * 100, 2) if ladder_battles > 0 and ladder_wins > 0 else 0.0
+
+    use_hero_num = _i(root.get("useHeroNum") if root.get("useHeroNum") is not None else (root.get("use_hero_num") or root.get("heroNum") or len(heroes)))
+
+    # Trả về rỗng nếu payload không chứa bất kỳ thông tin rank/mùa/trận nào
+    if not (grade_id or grade_name or stars or battles or wins or mvp or heroes or root.get("gradeStar") is not None or root.get("totalBattleNum") is not None):
+        return {}
+
     out = {}
-    if grade_id or grade_name or root.get("gradeStar") is not None:
-        out["season_rank"] = grade_name or ""
-        out["season_rank_id"] = grade_id
-        out["season_stars"] = _i(root.get("gradeStar"))
-        out["season_winrate"] = root.get("winRate")
-        out["season_battles"] = _i(root.get("totalBattleNum"))
-        out["season_wins"] = _i(root.get("winBattleNum"))
-        out["season_mvp"] = _i(root.get("mvpBattleNum"))
-        out["season_heroes_count"] = _i(root.get("useHeroNum"))
-        out["_source"] = "kgcamp_season"
+    out["season_rank"] = grade_name or ""
+    out["season_rank_id"] = grade_id
+    out["season_stars"] = stars
+    out["season_winrate"] = win_rate if win_rate is not None else 0
+    out["season_battles"] = battles
+    out["season_wins"] = wins
+    out["season_mvp"] = mvp
+    if ladder_battles > 0:
+        out["ladder_battles"] = ladder_battles
+        out["ladder_wins"] = ladder_wins
+        out["ladder_winrate"] = ladder_wr
+    out["season_heroes_count"] = use_hero_num
+    out["_source"] = "kgcamp_season"
     if heroes:
         out["top_heroes"] = heroes
     return out
 
 
 def _parse_kgcamp_season_list(data) -> list:
-    """Parse season/list → [{seasonId, seasonYear, seasonYearIndex, startTime, endTime}]."""
+    """Parse season/list → danh sách mùa được sort giảm dần (mùa mới nhất / hiện tại đứng đầu)."""
     if not isinstance(data, dict):
         return []
     root = data.get("data") if isinstance(data.get("data"), dict) else data
@@ -2729,12 +2962,105 @@ def _parse_kgcamp_season_list(data) -> list:
     for s in lst:
         if not isinstance(s, dict):
             continue
+        sid = s.get("seasonId") if s.get("seasonId") is not None else (s.get("season_id") or s.get("id"))
+        syear = s.get("seasonYear") if s.get("seasonYear") is not None else (s.get("season_year") or s.get("year"))
+        sidx = s.get("seasonYearIndex") if s.get("seasonYearIndex") is not None else (s.get("season_year_index") or s.get("index"))
+        st = s.get("startTime") if s.get("startTime") is not None else s.get("start_time")
+        et = s.get("endTime") if s.get("endTime") is not None else s.get("end_time")
+        is_cur = bool(s.get("isCur") or s.get("is_cur") or s.get("isCurrent") or s.get("is_current") or s.get("state") == 1 or s.get("status") == 1)
+
+        try:
+            sid_int = int(sid) if sid is not None else 0
+        except Exception:
+            sid_int = 0
+        try:
+            syear_int = int(syear) if syear is not None else 0
+        except Exception:
+            syear_int = 0
+        try:
+            sidx_int = int(sidx) if sidx is not None else 0
+        except Exception:
+            sidx_int = 0
+        try:
+            st_int = int(st) if st is not None else 0
+        except Exception:
+            st_int = 0
+        try:
+            et_int = int(et) if et is not None else 0
+        except Exception:
+            et_int = 0
+
         out.append({
-            "season_id": s.get("seasonId"),
-            "season_year": s.get("seasonYear"),
-            "season_year_index": s.get("seasonYearIndex"),
-            "start_time": s.get("startTime"),
-            "end_time": s.get("endTime"),
+            "season_id": sid,
+            "season_id_int": sid_int,
+            "season_year": syear,
+            "season_year_int": syear_int,
+            "season_year_index": sidx,
+            "season_year_index_int": sidx_int,
+            "start_time": st,
+            "start_time_int": st_int,
+            "end_time": et,
+            "end_time_int": et_int,
+            "is_cur": is_cur,
+            "_raw": s,
+        })
+
+    def _sort_key(item):
+        return (
+            1 if item.get("is_cur") else 0,
+            item.get("start_time_int") or 0,
+            (item.get("season_year_int") or 0) * 100 + (item.get("season_year_index_int") or 0),
+            item.get("season_id_int") or 0,
+        )
+    out.sort(key=_sort_key, reverse=True)
+    return out
+
+
+def _parse_kgcamp_battle_list(data) -> list:
+    """Parse /api/user/battle/list -> danh sách trận đấu gần nhất kèm KDA, kết quả thắng/thua, tướng."""
+    if not isinstance(data, dict):
+        return []
+    root = data.get("data") if isinstance(data.get("data"), dict) else data
+    if not isinstance(root, dict):
+        return []
+    lst = root.get("list") or root.get("battleList") or root.get("battles") or []
+    if not isinstance(lst, list):
+        return []
+
+    def _i(v):
+        try:
+            return int(float(v)) if v is not None and str(v).strip() != "" else 0
+        except (TypeError, ValueError):
+            return 0
+
+    out = []
+    for b in lst:
+        if not isinstance(b, dict):
+            continue
+        hid = b.get("heroId") or b.get("hero_id")
+        hname = b.get("heroName") or b.get("hero_name")
+        if not hname and hid:
+            hname = get_hero_name(str(hid)) or str(hid)
+        is_win = bool(b.get("win") or b.get("isWin") or b.get("is_win") or b.get("result") == 1 or b.get("battleResult") == 1)
+        kda = b.get("kda") or b.get("KDA") or ""
+        kills = _i(b.get("killNum") or b.get("kills") or 0)
+        deaths = _i(b.get("deadNum") or b.get("deaths") or 0)
+        assists = _i(b.get("assistNum") or b.get("assists") or 0)
+        mvp = bool(b.get("mvp") or b.get("isMvp") or b.get("is_mvp") or b.get("mvpType") == 1)
+        btime = b.get("battleTime") or b.get("battle_time") or b.get("time") or ""
+        game_type = b.get("gameType") or b.get("game_type") or b.get("mapName") or ""
+
+        out.append({
+            "hero_id": hid,
+            "hero_name": hname,
+            "is_win": is_win,
+            "kda": kda or f"{kills}/{deaths}/{assists}",
+            "kills": kills,
+            "deaths": deaths,
+            "assists": assists,
+            "is_mvp": mvp,
+            "battle_time": str(btime),
+            "game_type": str(game_type),
         })
     return out
 
@@ -2973,13 +3299,14 @@ def _kgcamp_full_flow(sess, host, origin, uid_s, aov_token, aov_open_id, ua, pro
         return {}
 
     # 4) EncodeParam qua node (camp-security-oversea, Tencent Chaos VM).
-    #    Mỗi Encodeparam là nonce dùng 1 lần → cần 3 cái tươi cho 3 request.
+    #    Mỗi Encodeparam là nonce dùng 1 lần → yêu cầu 8 cái để query cả selfinfo, season list,
+    #    fallback nhiều mùa gần nhất và lịch sử trận đấu gần nhất.
     try:
         from encode_param_helper import get_encode_params as _geps
     except Exception:
         return {}
-    enc_params = _geps(encryption, role_id, 3)
-    if not enc_params or len(enc_params) < 3 or not enc_params[0]:
+    enc_params = _geps(encryption, role_id, 8)
+    if not enc_params or len(enc_params) < 1 or not enc_params[0]:
         return {}
 
     # 5) getselfuserinfo kèm Encodeparam
@@ -2994,28 +3321,53 @@ def _kgcamp_full_flow(sess, host, origin, uid_s, aov_token, aov_open_id, ua, pro
     except Exception:
         parsed = {}
 
-    # 6) rank mùa: season/list → season/detail (seasonId mới nhất)
-    try:
-        h2 = dict(base_headers)
-        h2["Encodeparam"] = enc_params[1]
-        rl = sess.post(host + "/api/user/season/list", headers=h2,
-                       json={}, verify=False, timeout=10)
-        if rl.status_code == 200:
-            seasons = _parse_kgcamp_season_list(rl.json())
-            if seasons:
-                sid = seasons[0].get("season_id")
-                if sid:
-                    h3 = dict(base_headers)
-                    h3["Encodeparam"] = enc_params[2]
-                    rd = sess.post(host + "/api/user/season/detail", headers=h3,
-                                   json={"seasonId": str(sid)}, verify=False, timeout=10)
-                    if rd.status_code == 200:
-                        season = _parse_kgcamp_season(rd.json())
-                        if season:
-                            season["_season_list"] = seasons
-                            parsed["_season"] = season
-    except Exception:
-        pass
+    # 6) rank mùa + vinh danh: season/list → season/detail (mùa hiện tại & mùa đã chơi)
+    if len(enc_params) >= 3:
+        try:
+            h2 = dict(base_headers)
+            h2["Encodeparam"] = enc_params[1]
+            rl = sess.post(host + "/api/user/season/list", headers=h2,
+                           json={}, verify=False, timeout=10)
+            if rl.status_code == 200:
+                seasons = _parse_kgcamp_season_list(rl.json())
+                if seasons:
+                    # seasons[0] là mùa mới nhất/hiện tại do đã được sort
+                    cur_sid = seasons[0].get("season_id")
+                    cur_season_obj = seasons[0]
+                    cur_yr = cur_season_obj.get("season_year")
+                    cur_idx = cur_season_obj.get("season_year_index")
+                    cur_lbl = f"{cur_yr}-S{cur_idx}" if (cur_yr and cur_idx is not None) else (f"S{cur_yr}" if cur_yr else str(cur_sid))
+
+                    season = {}
+                    if cur_sid is not None:
+                        h3 = dict(base_headers)
+                        h3["Encodeparam"] = enc_params[2]
+                        rd = sess.post(host + "/api/user/season/detail", headers=h3,
+                                       json={"seasonId": str(cur_sid)}, verify=False, timeout=10)
+                        if rd.status_code == 200:
+                            season = _parse_kgcamp_season(rd.json())
+
+                    if season:
+                        season["_season_list"] = seasons
+                        season["season_id"] = cur_sid
+                        season["season_label"] = cur_lbl
+                        parsed["_season"] = season
+        except Exception:
+            pass
+
+    # 7) Lịch sử đấu gần nhất: /api/user/battle/list
+    if len(enc_params) >= 4:
+        try:
+            h_bt = dict(base_headers)
+            h_bt["Encodeparam"] = enc_params[3] if len(enc_params) > 3 else enc_params[-1]
+            r_bt = sess.post(host + "/api/user/battle/list", headers=h_bt,
+                             json={"page": 1, "pageSize": 10}, verify=False, timeout=10)
+            if r_bt.status_code == 200:
+                battles = _parse_kgcamp_battle_list(r_bt.json())
+                if battles:
+                    parsed["battle_history"] = battles
+        except Exception:
+            pass
 
     return parsed
 
@@ -3147,23 +3499,29 @@ def _merge_skins_prefer(old, new) -> dict:
             if float(v) > float(out[k]):
                 out[k] = v
 
-    # list fields: luôn giữ bản dài hơn từ o hoặc n (tránh wipe ownedItemIdList)
+    # list fields: hợp nhất danh sách không làm mất skin từ các lần fetch trước
     list_keys = set()
     for d in (o, n):
         for k, v in d.items():
             if isinstance(v, (list, tuple)):
                 list_keys.add(k)
     for k in list_keys:
-        ol = o.get(k) if isinstance(o.get(k), (list, tuple)) else []
-        nl = n.get(k) if isinstance(n.get(k), (list, tuple)) else []
-        if len(nl) > len(ol):
-            out[k] = list(nl)
-        elif ol:
-            out[k] = list(ol)
-        elif nl:
-            out[k] = list(nl)
+        ol = list(o.get(k) or []) if isinstance(o.get(k), (list, tuple)) else []
+        nl = list(n.get(k) or []) if isinstance(n.get(k), (list, tuple)) else []
+        # Hợp nhất giữ nguyên thứ tự và không trùng lặp
+        merged_list = list(dict.fromkeys(ol + nl))
+        if merged_list:
+            out[k] = merged_list
 
-    # ints max cho counters
+    # Nếu có owned_item_id_list hợp nhất lớn hơn, chạy lại phân loại để đồng bộ toàn bộ tier
+    all_owned = out.get("owned_item_id_list") or out.get("ownedItemIdList") or []
+    if isinstance(all_owned, (list, tuple)) and len(all_owned) > 0:
+        reclassified = _classify_skins(all_owned)
+        for k, v in reclassified.items():
+            out[k] = v
+        out["owned_item_id_list"] = list(all_owned)
+
+    # Counters an toàn
     for k in ("total_skins", "total_champs", "ss", "sss", "anime", "other", "cp"):
         try:
             ov = int(o.get(k) or 0)
@@ -4332,16 +4690,30 @@ def _fetch_sale_skins(redirect_url: str, proxy=None) -> dict:
                     user = ((body.get("data") or {}) if isinstance(body.get("data"), dict) else {}).get("getUser")
                 if user:
                     profile = user.get("profile") or {}
-                    owned = profile.get("ownedItemIdList") or profile.get("owned_item_id_list") or []
-                    if not isinstance(owned, list):
-                        owned = list(owned) if owned else []
+                    owned_raw = profile.get("ownedItemIdList") or profile.get("owned_item_id_list") or []
+                    if isinstance(owned_raw, dict):
+                        owned = list(owned_raw.keys())
+                    elif isinstance(owned_raw, str):
+                        owned = [x.strip() for x in owned_raw.split(",") if x.strip()]
+                    elif isinstance(owned_raw, (list, tuple, set)):
+                        owned = list(owned_raw)
+                    else:
+                        owned = [owned_raw] if owned_raw else []
                     result = _classify_skins(owned)
                     # giữ raw toàn bộ skin id (để đếm "skin mới" chưa phân loại)
                     result["owned_item_id_list"] = owned
                     # skin chưa nằm trong bất kỳ tier nào → "skin mới" / unclassified
-                    _unknown = [str(s) for s in owned
-                                if str(s) not in SKIN_SSS and str(s) not in SKIN_ANIME
-                                and str(s) not in SKIN_SS and str(s) not in SKIN_OTHER]
+                    _all_known_tier_ids = (
+                        set(SKIN_SSS) | set(SKIN_ANIME) | set(SKIN_SS) | set(SKIN_HUUHAN) |
+                        set(SKIN_SSM) | set(SKIN_TUYETSAC) | set(SKIN_CHUYENSAC) | set(SKIN_EVO) |
+                        set(SKIN_S_PLUS) | set(SKIN_S) | set(SKIN_A) | set(SKIN_SPECIAL) | set(_SKIN_ALL)
+                    )
+                    _unknown = [
+                        str(s) for s in owned
+                        if str(s).isdigit() and int(s) >= 10000 and (int(s) % 100 != 0)
+                        and str(int(s) // 100) in _HERO_ALL
+                        and str(s) not in _all_known_tier_ids
+                    ]
                     if _unknown:
                         result["new_skins"] = _unknown
                         result["new_skins_count"] = len(_unknown)
@@ -5246,10 +5618,18 @@ def _merge_hit_prefer(base: dict, newer: dict) -> dict:
     if sk_n or sk_o:
         out["aov_skins"] = _merge_skins_prefer(sk_o, sk_n)
 
-    for k in ("login_history", "sensitive_ops", "recent_games", "recent_game_names"):
+    for k in ("login_history", "sensitive_ops", "recent_games", "recent_game_names", "aov_battle_history", "aov_intimacy"):
         nv = newer.get(k)
         ov = out.get(k)
         if nv and (not ov or (isinstance(nv, list) and isinstance(ov, list) and len(nv) > len(ov))):
+            out[k] = nv
+
+    for k in ("aov_credit", "clan_name", "clan_role", "server_name", "logic_world_id",
+              "all_time_battles", "all_time_wins", "all_time_winrate", "popularity", "likes"):
+        nv = newer.get(k)
+        if nv not in (None, "", 0) and not out.get(k):
+            out[k] = nv
+        elif nv not in (None, "", 0) and k in ("aov_credit", "all_time_battles"):
             out[k] = nv
 
     for k in ("_kgcamp_season", "_kgcamp_rank", "_kt_player", "_weekly_profile", "aov_max_rank"):
@@ -5873,20 +6253,28 @@ def _check_login_once(account: str, password: str, timeout: int = 7, fetch_info:
                 except Exception:
                     _hr[_k] = {} if _k != 'recent_games' else []
 
-            # stash kg-camp payload (apply rank SAU weekly/kientuong để không bị đè)
+            # stash kg-camp payload & unpack all rich AOV fields
             kg = _hr.get('kgcamp') or {}
-            if isinstance(kg, dict) and (kg.get('rank') or kg.get('rank_stars') or kg.get('role_job')):
-                result['_kgcamp_rank'] = {
-                    k: kg.get(k) for k in (
-                        'rank', 'rank_stars', 'role_job', 'role_job_icon', 'name', '_api',
-                    ) if kg.get(k) not in (None, '')
-                }
+            if isinstance(kg, dict) and kg:
+                result['_kgcamp_rank'] = kg
                 if kg.get('name') and not result.get('aov_name'):
                     result['aov_name'] = kg.get('name')
-            # rank mùa + vinh danh (season/detail)
-            season = (kg or {}).get('_season') if isinstance(kg, dict) else {}
-            if isinstance(season, dict) and season:
-                result['_kgcamp_season'] = season
+                if kg.get('clan_name'):
+                    result['clan_name'] = kg.get('clan_name')
+                if kg.get('clan_role'):
+                    result['clan_role'] = kg.get('clan_role')
+                if kg.get('intimacy'):
+                    result['aov_intimacy'] = kg.get('intimacy')
+                if kg.get('server_name'):
+                    result['server_name'] = kg.get('server_name')
+                if kg.get('logic_world_id'):
+                    result['logic_world_id'] = kg.get('logic_world_id')
+                if kg.get('credit') is not None:
+                    result['aov_credit'] = kg.get('credit')
+                if kg.get('battle_history'):
+                    result['aov_battle_history'] = kg.get('battle_history')
+                if kg.get('_season'):
+                    result['_kgcamp_season'] = kg.get('_season')
 
             # Recent games (GameApp)
             rg = _hr.get('recent_games') or []
@@ -6163,6 +6551,22 @@ def _check_login_once(account: str, password: str, timeout: int = 7, fetch_info:
                         rank_stars=kg_stars if kg_stars > 0 else int(result.get('aov_rank_stars') or 0),
                         source='kgcamp',
                     )
+                if kg.get('name') and not result.get('aov_name'):
+                    result['aov_name'] = kg.get('name')
+                if kg.get('clan_name'):
+                    result['clan_name'] = kg.get('clan_name')
+                if kg.get('clan_role'):
+                    result['clan_role'] = kg.get('clan_role')
+                if kg.get('intimacy'):
+                    result['aov_intimacy'] = kg.get('intimacy')
+                if kg.get('server_name'):
+                    result['server_name'] = kg.get('server_name')
+                if kg.get('logic_world_id'):
+                    result['logic_world_id'] = kg.get('logic_world_id')
+                if kg.get('credit') is not None and result.get('aov_credit') is None:
+                    result['aov_credit'] = kg.get('credit')
+                if kg.get('battle_history'):
+                    result['aov_battle_history'] = kg.get('battle_history')
 
             # Final binding inference (sau mọi nguồn: init / napthe / aov / tcp)
             if _truthy_mask(result.get("masked_phone")) or _truthy_mask(result.get("aov_prefill_mobile")):
@@ -6315,6 +6719,15 @@ def _print_hit_box(r: dict):
         rank_display = f"{rank_base} ({stars_show} sao)" if stars_show > 0 else (rank_base or "Unranked")
         row("Rank", rank_display)
 
+    # ── Chiến tích tổng All-Time (6691 trận, 54.9% Tỉ lệ thắng) ──
+    _atb = r.get('all_time_battles')
+    _atw = r.get('all_time_winrate')
+    if _atb:
+        _at_str = f"{_atb} trận"
+        if _atw is not None:
+            _at_str += f"  ({_atw}% Tỉ lệ thắng)"
+        row("Chiến tích Tổng", _at_str)
+
     # ── Rank mùa + Vinh danh (season/detail) ──
     _season = r.get('_kgcamp_season') or {}
     if isinstance(_season, dict) and _season:
@@ -6322,15 +6735,25 @@ def _print_hit_box(r: dict):
         _ss = int(_season.get('season_stars') or 0)
         if _sr:
             _s_seg = f"{_sr} ({_ss} sao)" if _ss else _sr
-            row("Rank cao nhất", _s_seg)
-        _swr = _season.get('season_winrate')
-        if _swr is not None:
-            row("Tỉ lệ thắng", f"{_swr}%")
+            row("Rank mùa", _s_seg)
+        
+        _m_lbl = _season.get('season_label') or ''
         _sb = int(_season.get('season_battles') or 0)
         _sw = int(_season.get('season_wins') or 0)
         _sm = int(_season.get('season_mvp') or 0)
+        _swr = _season.get('season_winrate')
+
+        if _m_lbl:
+            row("Mùa giải", _m_lbl)
+
         if _sb or _sw or _sm:
-            row("Vinh danh", f"{_sw}W / {_sb} trận / {_sm} MVP")
+            _v_str = f"{_sw}W / {_sb} trận / {_sm} MVP"
+            if _swr is not None:
+                _v_str += f" ({_swr}%)"
+            row("Vinh danh mùa", _v_str)
+        else:
+            row("Vinh danh mùa", "0W / 0 trận / 0 MVP (0%)")
+
         _heroes = _season.get('top_heroes') or []
         if _heroes:
             _parts = []
@@ -6343,13 +6766,6 @@ def _print_hit_box(r: dict):
                     _parts.append(f"{hname} ({wr}% {bt} trận)")
             if _parts:
                 row("Tướng tủ", ', '.join(_parts))
-        _sl = _season.get('_season_list') or []
-        if _sl:
-            _s0 = _sl[0] if isinstance(_sl[0], dict) else {}
-            _yr = _s0.get('season_year')
-            _idx = _s0.get('season_year_index')
-            if _yr:
-                row("Mùa", f"S{_yr} ({_idx})" if _idx is not None else f"S{_yr}")
     if aov_lv:
         row("Level",    str(aov_lv))
     if aov_reg:
@@ -6397,18 +6813,23 @@ def _print_hit_box(r: dict):
             row("Lý do BAN", ban_reason)
 
     # Điểm uy tín trong game (0-100)
-    _credit = r.get('aov_credit')
+    _credit = r.get('aov_credit') if r.get('aov_credit') is not None else r.get('credit')
+    is_ban = (str(r.get('aov_banned') or '').upper() == 'YES' or bool(r.get('aov_ban_time')))
     if _credit is not None:
         try:
             _credit = int(_credit)
         except Exception:
             _credit = None
-        if _credit is not None:
-            _src = r.get("aov_credit_source") or ""
-            _lbl = f"{_credit}/100"
-            if _src:
-                _lbl += f"  ({_src})"
-            row("Điểm uy tín", _lbl)
+    if _credit is not None:
+        _src = r.get("aov_credit_source") or r.get("_credit_source") or ""
+        _lbl = f"{_credit}/100"
+        if _src and _src != "kgcamp":
+            _lbl += f"  ({_src})"
+        row("Điểm uy tín", _lbl)
+    elif is_ban:
+        row("Điểm uy tín", "0/100 (Tài khoản bị BAN)")
+    elif r.get('_kgcamp_rank') is not None or r.get('aov_name'):
+        row("Điểm uy tín", "100/100")
 
     # Uy tín (reputation score + level)
     _uy = r.get('uy_tin') or {}
@@ -6428,17 +6849,46 @@ def _print_hit_box(r: dict):
         )
         if _pt_str:
             row("Phong Thần", _pt_str)
-    # Sale item history
-    item_history = r.get('aov_item_history') or []
-    if item_history:
-        recent = item_history[:5]
-        hist_parts = []
-        for it in recent:
-            ts = (it.get('createdAt') or '')[:10]
-            extra = (it.get('extra') or it.get('source') or '?')[:20]
-            cost = it.get('costStr') or ''
-            hist_parts.append(f"{ts} {extra}({cost})" if cost else f"{ts} {extra}")
-        row("Lịch sử mua", ' | '.join(hist_parts))
+
+    # Bang hội & Chức vụ
+    _cname = r.get('clan_name')
+    _crole = str(r.get('clan_role') or '').strip()
+    if _cname is not None and str(_cname).strip():
+        _cname_s = str(_cname).strip()
+        row("Bang hội", f"{_cname_s} [{_crole}]" if _crole else _cname_s)
+    elif _cname is not None or r.get('_kgcamp_rank') is not None:
+        row("Bang hội", "Chưa vào bang")
+
+    # Tri Kỷ
+    _int_list = r.get('aov_intimacy')
+    if isinstance(_int_list, list) and len(_int_list) > 0:
+        row("Tri Kỷ", ', '.join(str(x) for x in _int_list[:3]))
+    elif isinstance(_int_list, list) or r.get('_kgcamp_rank') is not None:
+        row("Tri Kỷ", "Chưa thiết lập")
+
+    # Server
+    _srv = str(r.get('server_name') or '').strip()
+    _wid = str(r.get('logic_world_id') or '').strip()
+    if _srv or _wid:
+        row("Server", f"{_srv} ({_wid})" if _srv and _wid else (_srv or _wid))
+
+    # Lịch sử trận đấu gần nhất
+    _bh = r.get('aov_battle_history') or []
+    if isinstance(_bh, list) and _bh:
+        _b_parts = []
+        for b in _bh[:5]:
+            if isinstance(b, dict):
+                hn = b.get('hero_name') or 'Hero'
+                res_tag = 'Thắng' if b.get('is_win') else 'Thua'
+                kda = b.get('kda') or ''
+                mvp_tag = ' (MVP)' if b.get('is_mvp') else ''
+                _b_parts.append(f"{hn} [{res_tag}{mvp_tag} {kda}]".strip())
+        if _b_parts:
+            row("Lịch sử đấu", ' | '.join(_b_parts))
+    elif is_ban:
+        row("Lịch sử đấu", "Bị khóa do tài khoản bị BAN")
+    elif r.get('_kgcamp_rank') is not None or r.get('aov_name'):
+        row("Lịch sử đấu", "Không có trận trong 30 ngày gần đây")
 
     total_sk   = sk.get('total_skins', 0) or 0
     total_chmp = sk.get('total_champs', 0) or 0
@@ -6460,12 +6910,21 @@ def _print_hit_box(r: dict):
         ('special', 'Special'),
     )
     for tier_key, label in tier_meta:
-        cnt = sk.get(tier_key, 0) or 0
+        raw_val = sk.get(tier_key)
+        if isinstance(raw_val, list):
+            cnt = len(raw_val)
+            names_list = raw_val
+        elif isinstance(raw_val, (int, float)):
+            cnt = int(raw_val)
+            names_list = sk.get(f'{tier_key}_list') or []
+        else:
+            cnt = 0
+            names_list = []
         if cnt:
             if tier_key in ('a', 's', 's_plus', 'ssm'):
                 row(f"{label}({cnt})", "")
             else:
-                names = ', '.join(str(x) for x in (sk.get(f'{tier_key}_list') or [])[:6])
+                names = ', '.join(str(x) for x in names_list[:6])
                 row(f"{label}({cnt})", names)
 
     # ── Security signals ──
@@ -7080,52 +7539,49 @@ def _rank_display(rank_raw: str, stars: int = 0) -> str:
 
 
 def _apply_rank_to_result(result: dict, rank_name: str = "", rank_id=None,
-                          rank_stars: int = 0, rank_entry: dict = None,
+                          rank_stars: int = None, rank_entry: dict = None,
                           source: str = "") -> None:
     """
-    Ghi aov_rank / aov_rank_stars.
-    - Rank name = tên bậc (K.Cương III), không bắt buộc nhúng 'N sao' vào chuỗi
-    - aov_rank_stars = max(old, new) — higher-is-better, không demote 5→1 / 4→1
+    Ghi aov_rank / aov_rank_stars chuẩn xác từ nguồn API mới nhất.
     """
     if not isinstance(result, dict):
         return
     name = (rank_name or "").strip() or str(result.get("aov_rank") or "").strip()
-    try:
-        new_stars = int(rank_stars if rank_stars is not None else 0)
-    except Exception:
-        new_stars = 0
-    if not new_stars:
-        new_stars = _extract_rank_stars(name, 0) or _extract_rank_stars(
-            result.get("aov_rank") or "", 0
-        )
-    try:
-        old_stars = int(result.get("aov_rank_stars") or 0)
-    except Exception:
-        old_stars = 0
-    # Higher-is-better: weekly 4 rồi kientuong 1 → giữ 4
-    stars = max(int(new_stars or 0), int(old_stars or 0))
+    
+    # Auto-resolve numeric or missing rank name from rank_id
+    if (not name or name.isdigit()) and rank_id is not None:
+        try:
+            rid_int = int(rank_id)
+            if rid_int in _AOV_ROLEJOB_NAME:
+                name = _AOV_ROLEJOB_NAME[rid_int]
+        except Exception:
+            pass
+
+    if rank_stars is not None:
+        try:
+            stars = int(rank_stars)
+        except Exception:
+            stars = 0
+    else:
+        stars = _extract_rank_stars(name, 0) or _extract_rank_stars(result.get("aov_rank") or "", 0)
+        if stars == 0 and result.get("aov_rank_stars") is not None:
+            try:
+                stars = int(result.get("aov_rank_stars") or 0)
+            except Exception:
+                stars = 0
+
     base = _rank_base_name(name) or _rank_base_name(result.get("aov_rank") or "") or name
-    if not base and not stars:
+    if not base and stars is None:
         return
-    # id/entry/name: chỉ cập nhật khi nguồn mới không kém sao hơn (hoặc field còn trống)
-    if rank_id is not None and (result.get("aov_rank_id") is None or new_stars >= old_stars):
+    if rank_id is not None:
         result["aov_rank_id"] = rank_id
-    if rank_entry is not None and (not result.get("aov_rank_entry") or new_stars >= old_stars):
+    if rank_entry is not None:
         result["aov_rank_entry"] = rank_entry
-    if stars > 0:
-        result["aov_rank_stars"] = stars
-    elif "aov_rank_stars" not in result:
-        result["aov_rank_stars"] = 0
+    result["aov_rank_stars"] = max(0, stars)
     if base:
-        if (
-            not result.get("aov_rank")
-            or new_stars >= old_stars
-            or not _rank_base_name(result.get("aov_rank") or "")
-        ):
-            result["aov_rank"] = base
+        result["aov_rank"] = base
     if source:
-        if new_stars > old_stars or not result.get("aov_rank_source") or old_stars <= 0:
-            result["aov_rank_source"] = source
+        result["aov_rank_source"] = source
 
 
 def _extract_master_stars(rank_raw: str) -> int:

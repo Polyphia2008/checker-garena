@@ -109,13 +109,17 @@ def strip_fake_rank_fields(result: dict) -> dict:
         return result
     rank = str(result.get("aov_rank") or "").strip()
     if rank and not is_real_rank_name(rank):
-        if rank.isdigit() and result.get("aov_rank_id") is None:
+        if rank.isdigit():
             try:
-                result["aov_rank_id"] = int(rank)
+                rid = int(rank)
+                result["aov_rank_id"] = rid
+                from garena import _AOV_ROLEJOB_NAME
+                if rid in _AOV_ROLEJOB_NAME:
+                    result["aov_rank"] = _AOV_ROLEJOB_NAME[rid]
             except Exception:
                 pass
-        result["aov_rank"] = ""
         if not is_real_rank_name(result.get("aov_rank") or ""):
+            result["aov_rank"] = ""
             result["_fake_rank_stripped"] = True
     # clean empty after strip
     if not is_real_rank_name(result.get("aov_rank") or ""):
@@ -373,7 +377,9 @@ def safe_append_jsonl(path: str, obj: dict, dedupe_key: str = "") -> bool:
                         for kk in (
                             "season_rank", "season_rank_id", "season_stars",
                             "season_winrate", "season_battles", "season_wins",
-                            "season_mvp", "season_heroes_count",
+                            "season_mvp", "season_heroes_count", "season_label",
+                            "played_season_label", "season_id", "clan_name",
+                            "server_name", "logic_world_id", "credit",
                         )
                         if kk in v
                     }
@@ -381,7 +387,7 @@ def safe_append_jsonl(path: str, obj: dict, dedupe_key: str = "") -> bool:
                     if isinstance(_th, list) and _th:
                         clean[k]["top_heroes"] = _th[:6]
             elif isinstance(v, (list, tuple)):
-                if k in ("recent_game_names", "login_history", "sensitive_ops"):
+                if k in ("recent_game_names", "login_history", "sensitive_ops", "aov_battle_history", "aov_intimacy"):
                     clean[k] = list(v)[:10]
         # guarantee identity
         if "account" not in clean and obj.get("account"):

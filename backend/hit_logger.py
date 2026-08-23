@@ -72,6 +72,27 @@ def _derive_tinh_trang(h: dict) -> str:
     return "Full Info"
 
 
+def _safe_int(v, default: int = 0) -> int:
+    """Chuyển đổi an toàn sang int, không bao giờ raise exception với dữ liệu rác."""
+    if v is None or v is False or v is True:
+        return 1 if v is True else default
+    try:
+        if isinstance(v, (int, float)):
+            return int(v)
+        s = str(v).strip()
+        if not s or s.lower() in ("none", "null", "no", "n/a", "undefined"):
+            return default
+        if "." in s:
+            return int(float(s))
+        return int(s)
+    except Exception:
+        try:
+            m = re.search(r"\d+", str(v))
+            return int(m.group(0)) if m else default
+        except Exception:
+            return default
+
+
 def format_hit_line(h: dict) -> str:
     """Format a HIT result into the exact single-line hit.txt format."""
     if not isinstance(h, dict):
@@ -83,20 +104,20 @@ def format_hit_line(h: dict) -> str:
     uid = str(h.get('uid') or '')
     name_gr = str(h.get('username') or h.get('nickname') or '')
     name_game = str(h.get('aov_name') or '')
-    lv = int(h.get('aov_level', 0) or 0)
+    lv = _safe_int(h.get('aov_level', 0))
 
     # Rank hiện tại
     aov_rank = str(h.get('aov_rank') or '').strip()
     rank_base = aov_rank if aov_rank else "Chưa có"
-    stars = int(h.get('aov_rank_stars', 0) or 0)
+    stars = _safe_int(h.get('aov_rank_stars', 0))
     rank_cur_str = f"{rank_base} ({stars}s)" if stars > 0 else (rank_base or "Chưa có")
 
-    cp = int(sk.get('cp', 0) or 0)
-    shells = int(h.get('shells', 0) or 0)
+    cp = _safe_int(sk.get('cp', 0))
+    shells = _safe_int(h.get('shells', 0))
 
     # Email
     masked_email = str(h.get('masked_email') or '').strip()
-    email_v = int(h.get('email_v', 0) or 0)
+    email_v = _safe_int(h.get('email_v', 0))
     if masked_email and masked_email.replace('*', '').replace('@', '').replace('.', ''):
         ok = bool(h.get('email_verified')) or (email_v > 0)
         email_str = f"Yes [{masked_email}] ({'ĐÃ XÁC THỰC' if ok else 'CHƯA XÁC THỰC'})"
@@ -138,8 +159,8 @@ def format_hit_line(h: dict) -> str:
     idc = str(h.get('idcard') or '').strip()
     cccd_str = f"YES [{idc}]" if idc.replace('*', '').replace('-', '') else "NO"
 
-    tot_champs = int(sk.get('total_champs', 0) or 0)
-    tot_skins = int(sk.get('total_skins', 0) or 0)
+    tot_champs = _safe_int(sk.get('total_champs', 0))
+    tot_skins = _safe_int(sk.get('total_skins', 0))
 
     # Skin tiers
     skin_tier_parts = []
@@ -159,7 +180,7 @@ def format_hit_line(h: dict) -> str:
     )
     count_only_tiers = {'a', 's', 's_plus', 'ssm'}
     for tier_key, label in tier_meta:
-        cnt = int(sk.get(tier_key, 0) or 0)
+        cnt = _safe_int(sk.get(tier_key, 0))
         if cnt:
             if tier_key in count_only_tiers:
                 skin_tier_parts.append(f"{label}({cnt})")
@@ -177,12 +198,12 @@ def format_hit_line(h: dict) -> str:
     top_heroes_str = "Chưa có"
     if isinstance(_season, dict) and _season:
         _sr = (_season.get('season_rank') or '').strip()
-        _ss = int(_season.get('season_stars') or 0)
+        _ss = _safe_int(_season.get('season_stars'))
         if _sr:
             season_rank_str = f"{_sr} ({_ss}s)" if _ss > 0 else _sr
-        season_battles = int(_season.get('season_battles') or 0)
-        season_wins = int(_season.get('season_wins') or 0)
-        season_mvp = int(_season.get('season_mvp') or 0)
+        season_battles = _safe_int(_season.get('season_battles'))
+        season_wins = _safe_int(_season.get('season_wins'))
+        season_mvp = _safe_int(_season.get('season_mvp'))
         _swr = _season.get('season_winrate')
         if _swr is not None:
             season_winrate = str(_swr)
@@ -194,7 +215,7 @@ def format_hit_line(h: dict) -> str:
                     hid = item.get('hero_id')
                     hname = get_hero_name(hid) or str(hid)
                     wr = item.get('win_rate', 0)
-                    bt = item.get('battles', 0)
+                    bt = _safe_int(item.get('battles', 0))
                     h_parts.append(f"{hname} ({wr}% {bt} trận)")
             if h_parts:
                 top_heroes_str = ', '.join(h_parts)
@@ -237,6 +258,45 @@ def format_hit_line(h: dict) -> str:
     ]
     if skin_tier_parts:
         line_parts.extend(skin_tier_parts)
+    
+    _credit = h.get('aov_credit') if h.get('aov_credit') is not None else h.get('credit')
+    if _credit is not None:
+        try:
+            line_parts.append(f"UY TÍN: {int(_credit)}/100")
+        except Exception:
+            pass
+    elif is_ban:
+        line_parts.append("UY TÍN: 0/100 (BAN)")
+
+    _cname = h.get('clan_name')
+    if _cname is not None and str(_cname).strip():
+        _crole = str(h.get('clan_role') or '').strip()
+        line_parts.append(f"BANG HỘI: {str(_cname).strip()} [{_crole}]" if _crole else f"BANG HỘI: {str(_cname).strip()}")
+
+    _int_list = h.get('aov_intimacy')
+    if isinstance(_int_list, list) and _int_list:
+        line_parts.append(f"TRI KỶ: {', '.join(str(x) for x in _int_list[:2])}")
+
+    _atb = h.get('all_time_battles')
+    _atw = h.get('all_time_winrate')
+    if _atb:
+        line_parts.append(f"CHIẾN TÍCH TỔNG: {_atb} trận ({_atw}%)" if _atw is not None else f"CHIẾN TÍCH TỔNG: {_atb} trận")
+
+    _bh = h.get('aov_battle_history') or []
+    if isinstance(_bh, list) and _bh:
+        _b_parts = []
+        for b in _bh[:4]:
+            if isinstance(b, dict):
+                hn = b.get('hero_name') or 'Hero'
+                res_tag = 'Thắng' if b.get('is_win') else 'Thua'
+                kda = b.get('kda') or ''
+                mvp_tag = ' (MVP)' if b.get('is_mvp') else ''
+                _b_parts.append(f"{hn} [{res_tag}{mvp_tag} {kda}]".strip())
+        if _b_parts:
+            line_parts.append(f"LỊCH SỬ ĐẤU: {' | '.join(_b_parts)}")
+    elif is_ban:
+        line_parts.append("LỊCH SỬ ĐẤU: Bị khóa (BAN)")
+
     line_parts.extend([
         f"RANK CAO NHẤT: {season_rank_str}",
         f"TỔNG SỐ TRẬN ĐÃ CHƠI MÙA NÀY: {season_battles}",

@@ -118,25 +118,34 @@ def sig_for(ts: int, param: str) -> str:
     return hashlib.md5((str(ts) + param + SDK_KEY).encode()).hexdigest()
 
 
-def call(ts: int, param: str, seq: int = 1, encrypt: int = 0, timeout: int = 10):
+def call(ts: int, param: str, seq: int = 1, encrypt: int = 0, timeout: int = 10, proxy=None):
     sig = sig_for(ts, param)
     url = '%s/v2/auth/decrypt?channelid=%d&gameid=%d&os=1&seq=%d&ts=%d&version=1&sig=%s&itopencodeparam=%s' % (
         HOST, CHANNELID, GAMEID, seq, ts, sig, urllib.parse.quote(param))
     if encrypt:
         url += '&encrypt=1'
-    r = requests.get(url, timeout=timeout)
+    proxies = None
+    if proxy:
+        if isinstance(proxy, dict):
+            proxies = proxy
+        elif isinstance(proxy, str):
+            p = proxy.strip()
+            if not p.startswith("http"):
+                p = f"http://{p}"
+            proxies = {"http": p, "https": p}
+    r = requests.get(url, timeout=timeout, proxies=proxies, verify=False)
     return r.status_code, r.text
 
 
-def send(pt: bytes, ts: int, seq: int = 1, randseed: int = 1, encrypt: int = 0, timeout: int = 10):
+def send(pt: bytes, ts: int, seq: int = 1, randseed: int = 1, encrypt: int = 0, timeout: int = 10, proxy=None):
     param = forge_param(pt, randseed)
-    status, body = call(ts, param, seq, encrypt, timeout)
+    status, body = call(ts, param, seq, encrypt, timeout, proxy=proxy)
     return param, status, body
 
 
-def cmd(pt: bytes, ts: int, seq: int = 1, randseed: int = 1, timeout: int = 10) -> str:
+def cmd(pt: bytes, ts: int, seq: int = 1, randseed: int = 1, timeout: int = 10, proxy=None) -> str:
     """Send a plaintext command with encrypt=1 and return the decrypted response."""
-    param, status, body = send(pt, ts, seq, randseed, encrypt=1, timeout=timeout)
+    param, status, body = send(pt, ts, seq, randseed, encrypt=1, timeout=timeout, proxy=proxy)
     if status != 200:
         return 'HTTP %d: %s' % (status, body)
     return decrypt_response(body, ts, param)

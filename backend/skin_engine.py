@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from typing import Dict, List, Set, Tuple
 
 # In-memory dictionaries
@@ -27,6 +28,7 @@ SKIN_SPECIAL: Dict[str, str] = {}
 SKIN_OTHER: Dict[str, str] = {}
 _SKIN_ALL: Dict[str, str] = {}
 _HERO_ALL: Dict[str, str] = {}
+_BASE_HERO_IDS: Set[str] = set()
 _SKIN_ALL_LOADED: bool = False
 
 
@@ -46,7 +48,7 @@ def load_full_skin_maps() -> None:
     """Load toàn bộ skin và hero map từ folder gốc hoặc res/*.json vào memory."""
     global SKIN_SSS, SKIN_SS, SKIN_ANIME, SKIN_HUUHAN, SKIN_SSM, SKIN_TUYETSAC
     global SKIN_CHUYENSAC, SKIN_EVO, SKIN_S_PLUS, SKIN_S, SKIN_A, SKIN_SPECIAL
-    global SKIN_OTHER, _SKIN_ALL, _HERO_ALL, _SKIN_ALL_LOADED
+    global SKIN_OTHER, _SKIN_ALL, _HERO_ALL, _BASE_HERO_IDS, _SKIN_ALL_LOADED
     if _SKIN_ALL_LOADED:
         return
     _SKIN_ALL_LOADED = True
@@ -81,18 +83,34 @@ def load_full_skin_maps() -> None:
     except Exception:
         pass
 
-    # 3) Full Skin Database
+    # 3) Full Skin Database (chỉ nạp skin thực tế, lọc bỏ model mặc định index 00 hoặc trùng tên tướng)
     try:
         with open(_find_json("skin_id_map.json"), encoding="utf-8") as f:
             d = json.load(f)
             if isinstance(d, dict):
-                _SKIN_ALL.update({str(k): str(v) for k, v in d.items()})
+                for k, v in d.items():
+                    k_str = str(k).strip()
+                    v_str = str(v).strip()
+                    if not k_str.isdigit():
+                        continue
+                    n = int(k_str)
+                    # Ghi nhận ID model mặc định (n % 100 == 0)
+                    if n % 100 == 0:
+                        _BASE_HERO_IDS.add(k_str)
+                        continue
+                    # Bỏ qua nếu tên skin trùng 100% tên tướng (placeholder)
+                    hid = str(n // 100)
+                    hname = _HERO_ALL.get(hid, "")
+                    if hname and v_str.lower() == hname.lower():
+                        _BASE_HERO_IDS.add(k_str)
+                        continue
+                    _SKIN_ALL[k_str] = v_str
     except Exception:
         pass
 
 
 def get_hero_name(hero_id) -> str:
-    """Tra cứu tên tướng tiếng Việt từ ID."""
+    """Tra cứu tên tướng tiếng Việt chuẩn từ ID."""
     if not _SKIN_ALL_LOADED:
         load_full_skin_maps()
     return _HERO_ALL.get(str(hero_id).strip(), "")
@@ -106,12 +124,12 @@ def get_skin_name(skin_id) -> str:
 
 
 def skin_hero_id(skin_id) -> str:
-    """Trích xuất ID tướng từ Skin item ID (hero*100 + skin_index)."""
+    """Trích xuất ID tướng từ Skin item ID (hero*100 + skin_index) hoặc Hero ID."""
     sid = str(skin_id).strip()
     if not sid.isdigit():
         return sid
     n = int(sid)
-    if n >= 100:
+    if n >= 10000:
         return str(n // 100)
     return sid
 
@@ -128,7 +146,30 @@ def skin_id_to_name(skin_id) -> str:
     return get_skin_name(sid)
 
 
-def classify_skins(owned_ids: list) -> dict:
+def _norm_item_id(val) -> str:
+    """Normalize mixed raw item IDs (int, float, str) into clean integer string."""
+    if val is None:
+        return ""
+    if isinstance(val, (int, float)):
+        try:
+            return str(int(val))
+        except Exception:
+            return ""
+    s = str(val).strip()
+    if not s or s.lower() in ("none", "null", ""):
+        return ""
+    # Support '11101.0' or '11101'
+    try:
+        if "." in s:
+            return str(int(float(s)))
+        if s.isdigit():
+            return str(int(s))
+    except Exception:
+        pass
+    return re.sub(r"\D", "", s)
+
+
+def classify_skins(owned_ids: list, cp: int = 0) -> dict:
     """Classify owned skin IDs into all 12 tiers and count unique champions with strict deduplication."""
     if not _SKIN_ALL_LOADED:
         load_full_skin_maps()
@@ -138,11 +179,56 @@ def classify_skins(owned_ids: list) -> dict:
     s_plus_list, s_list, a_list, special_list = [], [], [], []
     hero_names: Set[str] = set()
 
-    # Deduplicate raw owned IDs
-    unique_owned = list(dict.fromkeys(str(x).strip() for x in owned_ids if str(x).strip()))
+    # Normalize and deduplicate raw owned IDs
+    cleaned_ids = []
+    if isinstance(owned_ids, dict):
+        owned_iter = owned_ids.keys()
+    elif isinstance(owned_ids, str):
+        owned_iter = [x.strip() for x in owned_ids.split(",") if x.strip()]
+    elif isinstance(owned_ids, (list, tuple, set)):
+        owned_iter = owned_ids
+    else:
+        owned_iter = [owned_ids] if owned_ids else []
+
+    for raw in owned_iter:
+        nid = _norm_item_id(raw)
+        if nid and nid != "0":
+            cleaned_ids.append(nid)
+
+    unique_owned = list(dict.fromkeys(cleaned_ids))
 
     for sid in unique_owned:
-        # Priority: SSS > Anime > SS > HuuHan > SSM > TuyetSac > ChuyenSac > EVO > S+ > S > A > Special
+        if not sid.isdigit():
+            continue
+
+        n = int(sid)
+
+        # 1) Trường hợp là Tướng (Hero ID < 10000), Base model (n % 100 == 0) hoặc Placeholder trùng tên tướng
+        # -> Ghi nhận tướng sở hữu, TUYỆT ĐỐI KHÔNG tính vào danh sách skin hay total_skins!
+        if n < 10000 or (n % 100 == 0) or sid in _BASE_HERO_IDS:
+            hid = str(n) if n < 10000 else str(n // 100)
+            hname = get_hero_name(hid)
+            if hname:
+                hero_names.add(hname.replace("’", "'").replace("`", "'").strip())
+            elif hid in _HERO_ALL:
+                hero_names.add(_HERO_ALL[hid].replace("’", "'").replace("`", "'").strip())
+            else:
+                hero_names.add(str(hid))
+            continue
+
+        # 2) Trường hợp là Trang phục (Skin index >= 1, n >= 10000 và không phải base model)
+        hid = str(n // 100)
+        hname = get_hero_name(hid)
+
+        # Ghi nhận tướng sở hữu tương ứng từ trang phục sở hữu
+        if hname:
+            hero_names.add(hname.replace("’", "'").replace("`", "'").strip())
+        elif hid in _HERO_ALL:
+            hero_names.add(_HERO_ALL[hid].replace("’", "'").replace("`", "'").strip())
+        elif hid:
+            hero_names.add(str(hid))
+
+        # Phân loại bậc theo thứ tự ưu tiên: SSS > Anime > SS > HuuHan > SSM > TuyetSac > ChuyenSac > EVO > S+ > S > A > Special
         if sid in SKIN_SSS:
             sss_list.append(SKIN_SSS[sid])
         elif sid in SKIN_ANIME:
@@ -178,18 +264,13 @@ def classify_skins(owned_ids: list) -> dict:
                 chuyensac_list.append(name)
             else:
                 a_list.append(name)
+        elif hid in _HERO_ALL:
+            # Skin mới của tướng trong game nhưng chưa có tên trong từ điển
+            hero_display = hname or _HERO_ALL.get(hid) or f"Hero {hid}"
+            a_list.append(f"{hero_display} Skin")
         else:
-            hid = skin_hero_id(sid)
-            hname = get_hero_name(hid) or f"Hero {hid}"
-            a_list.append(f"{hname} Skin")
-
-        # Canonical hero name deduplication
-        hid = skin_hero_id(sid)
-        hname = get_hero_name(hid)
-        if hname:
-            hero_names.add(hname.replace("’", "'").replace("`", "'").strip())
-        else:
-            hero_names.add(str(hid))
+            # ID vật phẩm khác (avatar, frame, hiệu ứng, điệu nhảy, mảnh ngọc...) -> Bỏ qua
+            continue
 
     def _dedup(l):
         return list(dict.fromkeys(l))
@@ -207,9 +288,16 @@ def classify_skins(owned_ids: list) -> dict:
     a_clean = _dedup(a_list)
     special_clean = _dedup(special_list)
 
+    total_skins_count = (
+        len(sss_clean) + len(ss_clean) + len(anime_clean) + len(huuhan_clean) +
+        len(ssm_clean) + len(tuyetsac_clean) + len(chuyensac_clean) + len(evo_clean) +
+        len(s_plus_clean) + len(s_clean) + len(a_clean) + len(special_clean)
+    )
+
     return {
-        'total_skins': len(unique_owned),
+        'total_skins': total_skins_count,
         'total_champs': len(hero_names),
+        'cp': cp,
         'sss': len(sss_clean), 'sss_list': sss_clean,
         'ss': len(ss_clean), 'ss_list': ss_clean,
         'anime': len(anime_clean), 'anime_list': anime_clean,
