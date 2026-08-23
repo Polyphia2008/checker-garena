@@ -3,7 +3,6 @@ require_once __DIR__ . '/Minhnhatdev_config.php';
 
 header('Content-Type: application/json; charset=utf-8');
 set_time_limit(Minhnhatdev_CHECK_TIMEOUT + 30);
-set_time_limit(Minhnhatdev_CHECK_TIMEOUT + 30);
 
 function Minhnhatdev_json(array $d): void {
     echo json_encode($d, JSON_UNESCAPED_UNICODE);
@@ -51,6 +50,10 @@ if ($remaining <= 0) {
 
 $cmd = escapeshellarg(Minhnhatdev_PYTHON) . ' ' . escapeshellarg(Minhnhatdev_BACKEND)
     . ' ' . escapeshellarg($account) . ' ' . escapeshellarg($password);
+$Minhnhatdev_proxyFile = Minhnhatdev_proxy_active_file();
+if ($Minhnhatdev_proxyFile !== '') {
+    $cmd .= ' --proxy ' . escapeshellarg($Minhnhatdev_proxyFile);
+}
 $cmd = 'cd ' . escapeshellarg(dirname(Minhnhatdev_BACKEND)) . ' && timeout ' . Minhnhatdev_CHECK_TIMEOUT . ' ' . $cmd . ' 2>/dev/null';
 
 $raw = shell_exec($cmd);
