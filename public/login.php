@@ -36,13 +36,16 @@ Minhnhatdev_page_head('Đăng Nhập');
 <div class="card-verify" style="max-width: 460px;">
   <div style="text-align: center; margin-bottom: 26px;">
     <div style="display: inline-flex; align-items: center; justify-content: center; padding: 16px; background-color: rgba(59,130,246,.08); border-radius: 20px; margin-bottom: 14px; color: #3b82f6; box-shadow: 0 10px 20px -5px rgba(59,130,246,.2);">
-      <i class="ki-filled ki-user" style="display: block; font-size: 2rem; line-height: 1;"></i>
+      <?= Minhnhatdev_icon('user', '', 32) ?>
     </div>
     <h3 style="font-weight: 800; color: #0f172a; margin: 0 0 6px 0; font-size: 20px;">Đăng Nhập Hệ Thống</h3>
     <p style="color: #64748b; font-size: 13px; margin: 0;">Đăng nhập để bắt đầu check tài khoản Garena</p>
   </div>
 
-  <?php if ($Minhnhatdev_err): ?><div class="Minhnhatdev-alert Minhnhatdev-alert-err"><i class="ki-filled ki-information-2"></i> <?= e($Minhnhatdev_err) ?></div><?php endif; ?>
+  <?php if ($Minhnhatdev_err): ?>
+  <div class="Minhnhatdev-alert Minhnhatdev-alert-err"><?= Minhnhatdev_icon('info', '', 16) ?> <?= e($Minhnhatdev_err) ?></div>
+  <script>window.addEventListener('load', function(){ MinhnhatdevToast(<?= json_encode($Minhnhatdev_err) ?>, 'error'); });</script>
+  <?php endif; ?>
 
   <form method="post" action="/login.php">
     <?= Minhnhatdev_csrf_field() ?>
@@ -55,7 +58,7 @@ Minhnhatdev_page_head('Đăng Nhập');
       <input name="password" type="password" class="input-field" style="width:100%; border-radius:14px;" placeholder="Mật khẩu" required>
     </div>
     <button type="submit" class="btn-submit" style="width:100%; background:#3b82f6; border-color:#3b82f6; color:#fff;">
-      <i class="ki-filled ki-right"></i> Đăng Nhập
+      <?= Minhnhatdev_icon('arrow-right', '', 16) ?> Đăng Nhập
     </button>
   </form>
   <p style="text-align:center; color:#64748b; font-size:13px; margin-top:16px;">Chưa có tài khoản? <a href="/register.php" style="color:#3b82f6; font-weight:700; text-decoration:none;">Đăng ký miễn phí</a></p>
